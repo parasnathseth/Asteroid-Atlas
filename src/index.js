@@ -84,6 +84,10 @@ let app = {
     this.dirLight = new THREE.DirectionalLight(0xffffff, params.sunIntensity)
     this.dirLight.position.set(-50, 0, 30)
     scene.add(this.dirLight)
+    
+    // Add ambient light to make entire Earth visible
+    this.ambientLight = new THREE.AmbientLight(0x404040, 0.6) // Soft white light
+    scene.add(this.ambientLight)
 
     // updates the progress bar to 10% on the loading UI
     await updateLoadingProgressBar(0.1)
@@ -112,9 +116,10 @@ let app = {
     scene.background = envMap
 
     // Create asteroid geometry and material for impact effects
-    this.asteroidGeometry = new THREE.IcosahedronGeometry(0.8, 1) // Larger irregular rocky shape
-    this.asteroidMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x666666, // Lighter gray for better visibility
+    // Base geometry and material - will be randomized per asteroid
+    this.baseAsteroidGeometry = new THREE.IcosahedronGeometry(0.8, 1) // Base irregular rocky shape
+    this.baseAsteroidMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x666666, // Base gray color - will be randomized
       roughness: 0.9,
       metalness: 0.1
     })
@@ -168,7 +173,7 @@ let app = {
 
     scene.add(this.group)
 
-    // Add mouse double-click event listener
+    // Add mouse double-click event listener for asteroid impacts
     renderer.domElement.addEventListener('dblclick', (event) => this.onMouseClick(event))
 
     // meshphysical.glsl.js is the shader used by MeshStandardMaterial: https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderLib/meshphysical.glsl.js
@@ -329,19 +334,36 @@ let app = {
   },
 
   launchAsteroid(targetPosition) {
-    // Create asteroid mesh
-    const asteroid = new THREE.Mesh(this.asteroidGeometry, this.asteroidMaterial)
+    // Generate random asteroid properties
+    const randomSize = 0.5 + Math.random() * 0.8 // Size between 0.5 and 1.3
+    const randomDetail = Math.floor(Math.random() * 2) + 1 // Detail level 1 or 2
+    const randomColor = this.generateRandomAsteroidColor()
     
-    // Calculate direction from target toward camera for direct approach
+    // Create randomly generated asteroid geometry
+    const asteroidGeometry = new THREE.IcosahedronGeometry(randomSize, randomDetail)
+    
+    // Apply random vertex displacement for more irregular shape
+    this.deformAsteroidGeometry(asteroidGeometry, randomSize)
+    
+    // Create random asteroid material
+    const asteroidMaterial = new THREE.MeshStandardMaterial({
+      color: randomColor,
+      roughness: 0.8 + Math.random() * 0.2, // Roughness between 0.8-1.0
+      metalness: Math.random() * 0.3, // Metalness between 0.0-0.3
+    })
+    
+    // Create asteroid mesh with randomized properties
+    const asteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial)
+    
+    // Get target position in world coordinates
     const targetWorldPos = this.group.localToWorld(targetPosition.clone())
-    const cameraDirection = camera.position.clone().sub(targetWorldPos).normalize()
     
-    // Start position: along the camera-to-target line, but further back
-    const startPosition = targetWorldPos.clone().add(cameraDirection.multiplyScalar(25))
+    // Calculate straight perpendicular approach - from surface normal direction
+    const surfaceNormal = targetPosition.clone().normalize()
     
-    // Convert back to group local coordinates
-    const localStartPosition = this.group.worldToLocal(startPosition)
-    asteroid.position.copy(localStartPosition)
+    // Start position: straight out from the surface along the normal
+    const startPosition = targetPosition.clone().add(surfaceNormal.multiplyScalar(25))
+    asteroid.position.copy(startPosition)
     
     // Add slight rotation to asteroid
     asteroid.rotation.set(
@@ -355,16 +377,67 @@ let app = {
       startPosition: startPosition.clone(),
       targetPosition: targetPosition.clone(),
       startTime: Date.now(),
-      duration: 2000, // 2 seconds flight time
+      duration: 1000, // 0.5 seconds flight time for immediate impact
       rotationSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.2,
-        (Math.random() - 0.5) * 0.2,
-        (Math.random() - 0.5) * 0.2
+        (Math.random() - 0.5) * 0.4, // Faster rotation for more dramatic effect
+        (Math.random() - 0.5) * 0.4,
+        (Math.random() - 0.5) * 0.4
       )
     }
     
     this.group.add(asteroid)
     this.asteroids.push(asteroid)
+  },
+
+  generateRandomAsteroidColor() {
+    // Generate random asteroid colors (grays, browns, dark reds)
+    const colorVariations = [
+      0x444444, // Dark gray
+      0x666666, // Medium gray
+      0x888888, // Light gray
+      0x553322, // Dark brown
+      0x664433, // Medium brown
+      0x441122, // Dark reddish
+      0x332211, // Very dark brown
+      0x555544, // Grayish brown
+    ]
+    
+    const baseColor = colorVariations[Math.floor(Math.random() * colorVariations.length)]
+    
+    // Add slight random tint variation
+    const r = ((baseColor >> 16) & 0xff) / 255
+    const g = ((baseColor >> 8) & 0xff) / 255
+    const b = (baseColor & 0xff) / 255
+    
+    // Apply slight random variation (±20%)
+    const variation = 0.2
+    const newR = Math.max(0, Math.min(1, r + (Math.random() - 0.5) * variation))
+    const newG = Math.max(0, Math.min(1, g + (Math.random() - 0.5) * variation))
+    const newB = Math.max(0, Math.min(1, b + (Math.random() - 0.5) * variation))
+    
+    return new THREE.Color(newR, newG, newB)
+  },
+
+  deformAsteroidGeometry(geometry, baseSize) {
+    // Add random vertex displacement for irregular asteroid shape
+    const positions = geometry.attributes.position.array
+    const deformationStrength = baseSize * 0.3 // Scale deformation with asteroid size
+    
+    for (let i = 0; i < positions.length; i += 3) {
+      const vertex = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2])
+      
+      // Add random displacement along the vertex normal
+      const displacement = (Math.random() - 0.5) * deformationStrength
+      const normal = vertex.clone().normalize()
+      vertex.add(normal.multiplyScalar(displacement))
+      
+      positions[i] = vertex.x
+      positions[i + 1] = vertex.y
+      positions[i + 2] = vertex.z
+    }
+    
+    geometry.attributes.position.needsUpdate = true
+    geometry.computeVertexNormals() // Recalculate normals after deformation
   },
 
   updateAsteroids() {
@@ -404,6 +477,9 @@ let app = {
     // Deform Earth geometry at impact point
     this.deformEarth(impactPosition)
     
+    // Create permanent orange impact marker
+    this.createPermanentImpactMarker(impactPosition)
+    
     // Create impact flash effect
     this.createImpactFlash(impactPosition)
   },
@@ -437,6 +513,34 @@ let app = {
     
     positionAttribute.needsUpdate = true
     earthGeometry.computeVertexNormals() // Recalculate normals for proper lighting
+  },
+
+  createPermanentImpactMarker(impactPosition) {
+    // Create permanent orange crater marker
+    const markerGeometry = new THREE.SphereGeometry(1.0, 16, 16) // Size matches crater deformation
+    const markerMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xff6600, // Bright orange
+      transparent: true,
+      opacity: 0.8
+    })
+    
+    const marker = new THREE.Mesh(markerGeometry, markerMaterial)
+    
+    // Position marker slightly above surface at impact point
+    const surfaceNormal = impactPosition.clone().normalize()
+    const markerPosition = impactPosition.clone().add(surfaceNormal.multiplyScalar(0.05))
+    marker.position.copy(markerPosition)
+    
+    // Scale marker to be flat against the surface (flatten along the normal direction)
+    marker.scale.set(1, 1, 0.1) // Flatten along Z-axis
+    
+    // Orient marker so its local Z-axis points along the surface normal (outward from sphere)
+    // Use lookAt to point the marker's forward direction along the surface normal
+    const target = markerPosition.clone().add(surfaceNormal)
+    marker.lookAt(target)
+    
+    // Add to group so it rotates with Earth
+    this.group.add(marker)
   },
 
   createImpactFlash(impactPosition) {
