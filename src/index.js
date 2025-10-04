@@ -59,7 +59,7 @@ const params = {
   showCoordinateInfo: true,
   showDebugGrid: true,
   targetLat: 40.7128, // New York by default
-  targetLon: -74.0060
+  targetLon: -74.0060,
   
   // Asteroid impact parameters
   asteroidSize: 100, // Size in meters (1m to 1500m = 1.5km)
