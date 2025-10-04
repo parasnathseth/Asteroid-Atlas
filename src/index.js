@@ -9,6 +9,18 @@ import { createCamera, createRenderer, runApp, updateLoadingProgressBar } from "
 
 // Other deps
 import { loadTexture } from "./common-utils"
+// Coordinate mapping utilities
+import { 
+  latLonToVector3, 
+  vector3ToLatLon, 
+  createLocationMarker, 
+  createLocationLabel, 
+  FAMOUS_LOCATIONS,
+  calculateDistance,
+  getRegionName
+} from "./coordinate-utils"
+// Debug utilities
+import { createDebugCoordinateGrid, testCoordinateMapping } from "./debug-coordinates"
 import Albedo from "./assets/Albedo.jpg"
 import Bump from "./assets/Bump.jpg"
 import Clouds from "./assets/Clouds.png"
@@ -34,6 +46,13 @@ const params = {
   atmOpacity: { value: 0.7 },
   atmPowFactor: { value: 4.1 },
   atmMultiplier: { value: 9.5 },
+  // coordinate system params
+  showLocationMarkers: true,
+  showLocationLabels: true,
+  showCoordinateInfo: true,
+  showDebugGrid: true,
+  targetLat: 40.7128, // New York by default
+  targetLon: -74.0060
 }
 
 
@@ -102,8 +121,8 @@ let app = {
 
     // create group for easier manipulation of objects(ie later with clouds and atmosphere added)
     this.group = new THREE.Group()
-    // earth's axial tilt is 23.5 degrees
-    this.group.rotation.z = 23.5 / 360 * 2 * Math.PI
+    // Remove axial tilt to align coordinates properly with geographic locations
+    // this.group.rotation.z = 23.5 / 360 * 2 * Math.PI
     
     let earthGeo = new THREE.SphereGeometry(10, 64, 64)
     let earthMat = new THREE.MeshStandardMaterial({
@@ -127,9 +146,9 @@ let app = {
     this.clouds = new THREE.Mesh(cloudGeo, cloudsMat)
     this.group.add(this.clouds)
     
-    // set initial rotational position of earth to get a good initial angle
-    this.earth.rotateY(-0.3)
-    this.clouds.rotateY(-0.3)
+    // Remove initial rotation to align coordinates properly with geographic locations
+    // this.earth.rotateY(-0.3)
+    // this.clouds.rotateY(-0.3)
 
     let atmosGeo = new THREE.SphereGeometry(12.5, 64, 64)
     let atmosMat = new THREE.ShaderMaterial({
@@ -148,6 +167,15 @@ let app = {
     this.group.add(this.atmos)
 
     scene.add(this.group)
+
+    // Initialize coordinate mapping system
+    this.initCoordinateSystem()
+
+    // Add debug coordinate grid to help with calibration
+    this.debugGrid = createDebugCoordinateGrid(scene)
+    
+    // Run coordinate mapping test in console
+    testCoordinateMapping()
 
     // meshphysical.glsl.js is the shader used by MeshStandardMaterial: https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderLib/meshphysical.glsl.js
     // shadowing of clouds, from https://discourse.threejs.org/t/how-to-cast-shadows-from-an-outer-sphere-to-an-inner-sphere/53732/6
@@ -236,6 +264,7 @@ let app = {
 
     // GUI controls
     const gui = new dat.GUI()
+    window.gui = gui // Store globally for updates
     gui.add(params, "sunIntensity", 0.0, 5.0, 0.1).onChange((val) => {
       this.dirLight.intensity = val
     }).name("Sun Intensity")
@@ -247,6 +276,39 @@ let app = {
     gui.add(params.atmPowFactor, "value", 0.0, 20.0, 0.1).name("atmPowFactor")
     gui.add(params.atmMultiplier, "value", 0.0, 20.0, 0.1).name("atmMultiplier")
 
+    // Coordinate system controls
+    const coordFolder = gui.addFolder('Coordinate System')
+    coordFolder.add(params, "showLocationMarkers").onChange((val) => {
+      this.updateMarkersVisibility()
+    }).name("Show Markers")
+    coordFolder.add(params, "showLocationLabels").onChange((val) => {
+      this.updateLabelsVisibility()
+    }).name("Show Labels")
+    coordFolder.add(params, "showDebugGrid").onChange((val) => {
+      this.debugGrid.visible = val
+    }).name("Show Debug Grid")
+    coordFolder.add(params, "targetLat", -90, 90, 0.1).onChange((val) => {
+      this.updateTargetLocation()
+    }).name("Target Latitude")
+    coordFolder.add(params, "targetLon", -180, 180, 0.1).onChange((val) => {
+      this.updateTargetLocation()
+    }).name("Target Longitude")
+    
+    // Add buttons for famous locations
+    const locationActions = {
+      'Go to New York': () => this.goToLocation(40.7128, -74.0060),
+      'Go to London': () => this.goToLocation(51.5074, -0.1278),
+      'Go to Tokyo': () => this.goToLocation(35.6762, 139.6503),
+      'Go to Sydney': () => this.goToLocation(-33.8688, 151.2093),
+      'Clear Markers': () => this.clearCustomMarkers()
+    }
+    
+    Object.keys(locationActions).forEach(actionName => {
+      coordFolder.add(locationActions, actionName)
+    })
+    
+    coordFolder.open()
+
     // Stats - show fps
     this.stats1 = new Stats()
     this.stats1.showPanel(0) // Panel 0 = fps
@@ -256,26 +318,203 @@ let app = {
 
     await updateLoadingProgressBar(1.0, 100)
   },
+
+  // Initialize the coordinate mapping system
+  initCoordinateSystem() {
+    this.locationMarkers = new THREE.Group()
+    this.locationLabels = new THREE.Group()
+    this.customMarkers = new THREE.Group()
+    
+    // Add marker groups directly to scene since Earth is not rotating
+    scene.add(this.locationMarkers)
+    scene.add(this.locationLabels)
+    scene.add(this.customMarkers)
+    
+    // Add markers for famous locations
+    Object.entries(FAMOUS_LOCATIONS).forEach(([name, coords]) => {
+      const marker = createLocationMarker(coords.lat, coords.lon, { 
+        color: 0x00ff00, 
+        size: 0.1 
+      })
+      const label = createLocationLabel(name, coords.lat, coords.lon)
+      
+      this.locationMarkers.add(marker)
+      this.locationLabels.add(label)
+    })
+    
+    // Add target location marker
+    this.targetMarker = createLocationMarker(params.targetLat, params.targetLon, {
+      color: 0xff0000,
+      size: 0.2
+    })
+    this.customMarkers.add(this.targetMarker)
+    
+    // Initialize coordinate info display
+    this.createCoordinateInfoDisplay()
+    
+    // Add mouse interaction for clicking on Earth
+    this.setupEarthInteraction()
+    
+    this.updateMarkersVisibility()
+    this.updateLabelsVisibility()
+  },
+
+  // Create coordinate info display
+  createCoordinateInfoDisplay() {
+    const infoDiv = document.createElement('div')
+    infoDiv.style.cssText = `
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      max-width: 300px;
+      z-index: 1000;
+    `
+    infoDiv.innerHTML = `
+      <h3 style="margin: 0 0 10px 0;">Coordinate Information</h3>
+      <div id="coord-info">Click on Earth to get coordinates</div>
+      <div id="location-info" style="margin-top: 10px;"></div>
+    `
+    this.container.appendChild(infoDiv)
+    this.coordInfoDiv = infoDiv.querySelector('#coord-info')
+    this.locationInfoDiv = infoDiv.querySelector('#location-info')
+  },
+
+  // Setup mouse interaction for Earth clicking
+  setupEarthInteraction() {
+    this.raycaster = new THREE.Raycaster()
+    this.mouse = new THREE.Vector2()
+    
+    renderer.domElement.addEventListener('click', (event) => {
+      // Calculate mouse position in normalized device coordinates
+      const rect = renderer.domElement.getBoundingClientRect()
+      this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+      
+      // Update the picking ray with the camera and mouse position
+      this.raycaster.setFromCamera(this.mouse, camera)
+      
+      // Calculate objects intersecting the picking ray
+      const intersects = this.raycaster.intersectObject(this.earth)
+      
+      if (intersects.length > 0) {
+        const intersectionPoint = intersects[0].point
+        const coords = vector3ToLatLon(intersectionPoint)
+        
+        // Update coordinate display
+        this.updateCoordinateDisplay(coords.lat, coords.lon, intersectionPoint)
+        
+        // Add a temporary marker at clicked location
+        this.addTemporaryMarker(coords.lat, coords.lon)
+      }
+    })
+  },
+
+  // Update coordinate display
+  updateCoordinateDisplay(lat, lon, position) {
+    const latStr = `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? 'N' : 'S'}`
+    const lonStr = `${Math.abs(lon).toFixed(4)}°${lon >= 0 ? 'E' : 'W'}`
+    const region = getRegionName(lat, lon)
+    
+    // Debug logging
+    console.log(`Clicked coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)}`)
+    
+    this.coordInfoDiv.innerHTML = `
+      <strong>Latitude:</strong> ${latStr}<br>
+      <strong>Longitude:</strong> ${lonStr}<br>
+      <strong>Region:</strong> ${region}
+    `
+    
+    // Calculate distance to target location
+    const distance = calculateDistance(lat, lon, params.targetLat, params.targetLon)
+    this.locationInfoDiv.innerHTML = `
+      <strong>Distance to target:</strong> ${distance.toFixed(0)} km
+    `
+  },
+
+  // Add temporary marker at clicked location
+  addTemporaryMarker(lat, lon) {
+    // Remove previous temporary marker
+    if (this.tempMarker) {
+      this.customMarkers.remove(this.tempMarker)
+    }
+    
+    // Add new temporary marker
+    this.tempMarker = createLocationMarker(lat, lon, {
+      color: 0xffff00,
+      size: 0.15
+    })
+    this.customMarkers.add(this.tempMarker)
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (this.tempMarker) {
+        this.customMarkers.remove(this.tempMarker)
+        this.tempMarker = null
+      }
+    }, 5000)
+  },
+
+  // Go to a specific location
+  goToLocation(lat, lon) {
+    params.targetLat = lat
+    params.targetLon = lon
+    this.updateTargetLocation()
+    
+    // Update coordinate display
+    this.updateCoordinateDisplay(lat, lon)
+  },
+
+  // Update target location marker
+  updateTargetLocation() {
+    if (this.targetMarker) {
+      const newPosition = latLonToVector3(params.targetLat, params.targetLon, 10.1)
+      this.targetMarker.position.copy(newPosition)
+      this.targetMarker.userData = { lat: params.targetLat, lon: params.targetLon }
+    }
+  },
+
+  // Update marker visibility
+  updateMarkersVisibility() {
+    this.locationMarkers.visible = params.showLocationMarkers
+    this.customMarkers.visible = params.showLocationMarkers
+  },
+
+  // Update label visibility
+  updateLabelsVisibility() {
+    this.locationLabels.visible = params.showLocationLabels
+  },
+
+  // Clear custom markers
+  clearCustomMarkers() {
+    while(this.customMarkers.children.length > 1) { // Keep target marker
+      this.customMarkers.remove(this.customMarkers.children[1])
+    }
+    if (this.tempMarker) {
+      this.tempMarker = null
+    }
+  },
+
   // @param {number} interval - time elapsed between 2 frames
   // @param {number} elapsed - total time elapsed since app start
   updateScene(interval, elapsed) {
     this.controls.update()
     this.stats1.update()
 
-    // use rotateY instead of rotation.y so as to rotate by axis Y local to each mesh
-    this.earth.rotateY(interval * 0.005 * params.speedFactor)
-    this.clouds.rotateY(interval * 0.01 * params.speedFactor)
+    // Disabled Earth rotation to keep cities in fixed positions
+    // this.earth.rotateY(interval * 0.005 * params.speedFactor)
+    // this.clouds.rotateY(interval * 0.01 * params.speedFactor)
 
     const shader = this.earth.material.userData.shader
     if ( shader ) {
-      // As for each n radians Point X has rotated, Point Y would have rotated 2n radians.
-      // Thus uv.x of Point Y would always be = uv.x of Point X - n / 2π.
-      // Dividing n by 2π is to convert from radians(i.e. 0 to 2π) into the uv space(i.e. 0 to 1).
-      // The offset n / 2π would be passed into the shader program via the uniform variable: uv_xOffset.
-      // We do offset % 1 because the value of 1 for uv.x means full circle,
-      // whenever uv_xOffset is larger than one, offsetting 2π radians is like no offset at all.
-      let offset = (interval * 0.005 * params.speedFactor) / (2 * Math.PI)
-      shader.uniforms.uv_xOffset.value += offset % 1
+      // Disabled shader uniform updates since Earth is not rotating
+      // let offset = (interval * 0.005 * params.speedFactor) / (2 * Math.PI)
+      // shader.uniforms.uv_xOffset.value += offset % 1
     }
   }
 }
@@ -289,3 +528,60 @@ let app = {
  * ps. if you don't use post-processing, pass undefined to the 'composer'(last) param
  *************************************************/
 runApp(app, scene, renderer, camera, true, undefined, undefined)
+
+// Store app reference globally for HTML interface
+window.appInstance = app
+
+/**************************************************
+ * 4. Global functions for HTML interface
+ *************************************************/
+// Make coordinate functions globally accessible for HTML buttons
+window.goToInputCoordinates = function() {
+  const lat = parseFloat(document.getElementById('lat-input').value)
+  const lon = parseFloat(document.getElementById('lon-input').value)
+  
+  if (isNaN(lat) || isNaN(lon)) {
+    alert('Please enter valid latitude and longitude values')
+    return
+  }
+  
+  if (lat < -90 || lat > 90) {
+    alert('Latitude must be between -90 and 90 degrees')
+    return
+  }
+  
+  if (lon < -180 || lon > 180) {
+    alert('Longitude must be between -180 and 180 degrees')
+    return
+  }
+  
+  window.appInstance.goToLocation(lat, lon)
+  
+  // Also update the GUI sliders
+  if (window.gui) {
+    window.gui.updateDisplay()
+  }
+}
+
+window.addMarkerAtInput = function() {
+  const lat = parseFloat(document.getElementById('lat-input').value)
+  const lon = parseFloat(document.getElementById('lon-input').value)
+  
+  if (isNaN(lat) || isNaN(lon)) {
+    alert('Please enter valid latitude and longitude values')
+    return
+  }
+  
+  // Add a permanent marker
+  const marker = createLocationMarker(lat, lon, {
+    color: 0x00ffff,
+    size: 0.15
+  })
+  window.appInstance.customMarkers.add(marker)
+}
+
+window.setCoordinates = function(lat, lon) {
+  document.getElementById('lat-input').value = lat
+  document.getElementById('lon-input').value = lon
+  window.appInstance.goToLocation(lat, lon)
+}
