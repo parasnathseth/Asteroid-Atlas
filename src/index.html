@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, shrink-to-fit=0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
-    <title>Threejs Earth</title>
+    <title data-i18n="title">Threejs Earth</title>
     <style>
       html,
       body {
@@ -106,6 +106,27 @@
       #coordinate-input button:hover {
         background: #0052a3;
       }
+      #language-selector-container {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 10px;
+        border-radius: 8px;
+        z-index: 1001;
+      }
+      #language-selector {
+        background: #333;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 5px;
+        font-size: 12px;
+      }
+      #language-selector option {
+        background: #333;
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -114,31 +135,71 @@
       <div id="progress-bar"><div id="progress"></div></div>
     </div>
     
+    <!-- Language Selector -->
+    <div id="language-selector-container">
+      <label for="language-selector" data-i18n="ui.language" style="color: white; font-size: 12px; margin-right: 5px;">Language:</label>
+      <select id="language-selector" onchange="changeLanguage(this.value)">
+        <option value="en">English</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+        <option value="zh">中文</option>
+      </select>
+    </div>
+    
     <!-- Coordinate Input Interface -->
     <div id="coordinate-input">
-      <h4 style="margin: 0 0 10px 0;">Navigate to Coordinates</h4>
+      <h4 style="margin: 0 0 10px 0;" data-i18n="navigation.title">Navigate to Coordinates</h4>
       <div>
-        <label>Lat:</label>
-        <input type="number" id="lat-input" min="-90" max="90" step="0.0001" value="40.7128" placeholder="Latitude">
-        <label>Lon:</label>
-        <input type="number" id="lon-input" min="-180" max="180" step="0.0001" value="-74.0060" placeholder="Longitude">
+        <label data-i18n="navigation.latitude">Lat:</label>
+        <input type="number" id="lat-input" min="-90" max="90" step="0.0001" value="40.7128" data-i18n="navigation.latitude_placeholder" placeholder="Latitude">
+        <label data-i18n="navigation.longitude">Lon:</label>
+        <input type="number" id="lon-input" min="-180" max="180" step="0.0001" value="-74.0060" data-i18n="navigation.longitude_placeholder" placeholder="Longitude">
       </div>
       <div style="margin-top: 10px;">
-        <button onclick="goToInputCoordinates()">Go to Location</button>
-        <button onclick="addMarkerAtInput()">Add Marker</button>
-        <button onclick="goToMyCurrentLocation()" style="background: #ff6600;">📍 My Location</button>
+        <button onclick="goToInputCoordinates()" data-i18n="navigation.go_to_location">Go to Location</button>
+        <button onclick="addMarkerAtInput()" data-i18n="navigation.add_marker">Add Marker</button>
+        <button onclick="goToMyCurrentLocation()" style="background: #ff6600;" data-i18n="navigation.my_location">📍 My Location</button>
       </div>
       <div style="margin-top: 10px; font-size: 12px;">
-        <strong>Quick Locations:</strong><br>
-        <button onclick="setCoordinates(51.5074, -0.1278)">London</button>
-        <button onclick="setCoordinates(35.6762, 139.6503)">Tokyo</button>
-        <button onclick="setCoordinates(-33.8688, 151.2093)">Sydney</button>
+        <strong data-i18n="navigation.quick_locations">Quick Locations:</strong><br>
+        <button onclick="setCoordinates(51.5074, -0.1278)" data-i18n="locations.london">London</button>
+        <button onclick="setCoordinates(35.6762, 139.6503)" data-i18n="locations.tokyo">Tokyo</button>
+        <button onclick="setCoordinates(-33.8688, 151.2093)" data-i18n="locations.sydney">Sydney</button>
       </div>
-      <div style="margin-top: 10px; font-size: 11px; color: #ccc;">
+      <div style="margin-top: 10px; font-size: 11px; color: #ccc;" data-i18n="navigation.click_instruction">
         Click on Earth to get coordinates at that point
       </div>
     </div>
     
+    <script src="./i18n.js" type="module"></script>
     <script src="./index.js" type="module"></script>
+    <script>
+      // Global function to change language
+      async function changeLanguage(language) {
+        await window.i18n.changeLanguage(language);
+      }
+      
+      // Initialize i18n when page loads
+      document.addEventListener('DOMContentLoaded', async () => {
+        await window.i18n.init();
+        
+        // Listen for language changes to update dynamic content
+        window.addEventListener('languageChanged', (event) => {
+          // Update quick location button text
+          updateQuickLocationButtons();
+        });
+      });
+      
+      // Update quick location button text based on current language
+      function updateQuickLocationButtons() {
+        const buttons = document.querySelectorAll('#coordinate-input button[onclick*="setCoordinates"]');
+        if (buttons.length >= 3) {
+          buttons[0].textContent = window.i18n.translateLocation('London');
+          buttons[1].textContent = window.i18n.translateLocation('Tokyo');  
+          buttons[2].textContent = window.i18n.translateLocation('Sydney');
+        }
+      }
+    </script>
   </body>
 </html>
