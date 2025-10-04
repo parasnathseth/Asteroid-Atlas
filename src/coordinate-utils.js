@@ -4,6 +4,13 @@
  */
 
 import * as THREE from "three"
+import { getCountryKey, getCityKey, getStateProvinceKey } from './location-translator.js'
+
+// Import i18n globally if available
+let i18n = null;
+if (typeof window !== 'undefined' && window.i18n) {
+  i18n = window.i18n;
+}
 
 /**
  * Convert latitude/longitude to 3D position on sphere
@@ -187,22 +194,27 @@ export async function getRegionName(lat, lon) {
     if (response.ok) {
       const data = await response.json();
       
-      // Extract location information in order of preference
+      // Extract and translate location information
       if (data.countryName) {
-        // Add more detail if available
-        let location = data.countryName;
+        const translatedCountry = translateLocationName(data.countryName, 'country');
+        let location = translatedCountry;
         
+        // Add more detail if available
         if (data.principalSubdivision && data.principalSubdivision !== data.countryName) {
-          location = `${data.principalSubdivision}, ${data.countryName}`;
+          const translatedSubdivision = translateLocationName(data.principalSubdivision, 'subdivision');
+          location = `${translatedSubdivision}, ${translatedCountry}`;
         } else if (data.city && data.city !== data.countryName) {
-          location = `${data.city}, ${data.countryName}`;
+          const translatedCity = translateLocationName(data.city, 'city');
+          location = `${translatedCity}, ${translatedCountry}`;
         }
         
         return location;
       }
       
       // Fallback to locality if country not found
-      if (data.locality) return data.locality;
+      if (data.locality) {
+        return translateLocationName(data.locality, 'city');
+      }
     }
   } catch (error) {
     console.warn('Reverse geocoding failed, using fallback detection:', error.message);
@@ -318,4 +330,91 @@ export async function getDetailedLocation(lat, lon) {
     coordinates: { lat, lon },
     source: 'Fallback'
   };
+}
+
+/**
+ * Helper function to translate location names using the translation mappings
+ * @param {string} locationName - Original location name from API
+ * @param {string} type - Type of location (country, city, subdivision)
+ * @returns {string} Translated location name or original if no translation found
+ */
+function translateLocationName(locationName, type) {
+  try {
+    // Update i18n reference if not available
+    if (!i18n && typeof window !== 'undefined' && window.i18n) {
+      i18n = window.i18n;
+    }
+    
+    if (!i18n || !locationName) {
+      return locationName;
+    }
+    
+    let translationKey = null;
+    
+    switch (type) {
+      case 'country':
+        translationKey = getCountryKey(locationName);
+        if (translationKey) {
+          const translated = i18n.t(`countries.${translationKey}`);
+          // Return translation if it's different from the key (meaning translation exists)
+          if (translated && translated !== `countries.${translationKey}`) {
+            return translated;
+          }
+        }
+        break;
+        
+      case 'city':
+        translationKey = getCityKey(locationName);
+        if (translationKey) {
+          const translated = i18n.t(`locations.${translationKey}`);
+          if (translated && translated !== `locations.${translationKey}`) {
+            return translated;
+          }
+        }
+        break;
+        
+      case 'subdivision':
+        translationKey = getStateProvinceKey(locationName);
+        if (translationKey) {
+          const translated = i18n.t(`locations.${translationKey}`);
+          if (translated && translated !== `locations.${translationKey}`) {
+            return translated;
+          }
+        }
+        break;
+        
+      default:
+        // Try all translation types if type is unknown
+        const countryKey = getCountryKey(locationName);
+        if (countryKey) {
+          const translated = i18n.t(`countries.${countryKey}`);
+          if (translated && translated !== `countries.${countryKey}`) {
+            return translated;
+          }
+        }
+        
+        const cityKey = getCityKey(locationName);
+        if (cityKey) {
+          const translated = i18n.t(`locations.${cityKey}`);
+          if (translated && translated !== `locations.${cityKey}`) {
+            return translated;
+          }
+        }
+        
+        const stateKey = getStateProvinceKey(locationName);
+        if (stateKey) {
+          const translated = i18n.t(`locations.${stateKey}`);
+          if (translated && translated !== `locations.${stateKey}`) {
+            return translated;
+          }
+        }
+        break;
+    }
+    
+    // Return original if no translation found
+    return locationName;
+  } catch (error) {
+    console.warn('Translation failed for location:', locationName, error);
+    return locationName;
+  }
 }

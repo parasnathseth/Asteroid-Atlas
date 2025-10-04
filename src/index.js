@@ -34,6 +34,9 @@ import GaiaSky from "./assets/Gaia_EDR3_darkened.png"
 import asteroidOrbitData from "./assets/asteroid_orbit_coords.json"
 
 global.THREE = THREE
+// Make i18n available globally for other modules
+global.i18n = i18n
+window.i18n = i18n
 // previously this feature is .legacyMode = false, see https://www.donmccurdy.com/2020/06/17/color-management-in-threejs/
 // turning this on has the benefit of doing certain automatic conversions (for hexadecimal and CSS colors from sRGB to linear-sRGB)
 THREE.ColorManagement.enabled = true
