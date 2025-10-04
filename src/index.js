@@ -17,6 +17,7 @@ import NightLights from "./assets/night_lights_modified.png"
 import vertexShader from "./shaders/vertex.glsl"
 import fragmentShader from "./shaders/fragment.glsl"
 import GaiaSky from "./assets/Gaia_EDR3_darkened.png"
+import asteroidOrbitData from "./assets/asteroid_orbit_coords.json"
 
 global.THREE = THREE
 // previously this feature is .legacyMode = false, see https://www.donmccurdy.com/2020/06/17/color-management-in-threejs/
@@ -34,6 +35,13 @@ const params = {
   atmOpacity: { value: 0.7 },
   atmPowFactor: { value: 4.1 },
   atmMultiplier: { value: 9.5 },
+  
+  // Asteroid impact parameters
+  asteroidSize: 100, // Size in meters (1m to 1500m = 1.5km)
+  asteroidSpeed: 20, // Speed in km/s (1 to 100 km/s)
+  
+  // Orbital paths parameters
+  showOrbitalPaths: true,
 }
 
 
@@ -79,6 +87,9 @@ let app = {
     // Initialize asteroid system arrays
     this.asteroids = []
     this.impactSites = []
+    
+    // Array to store orbital paths
+    this.orbitalPaths = []
 
     // adding a virtual sun using directional light
     this.dirLight = new THREE.DirectionalLight(0xffffff, params.sunIntensity)
@@ -175,6 +186,9 @@ let app = {
 
     // Add mouse double-click event listener for asteroid impacts
     renderer.domElement.addEventListener('dblclick', (event) => this.onMouseClick(event))
+
+    // Load and create asteroid orbital paths
+    await this.createOrbitalPaths()
 
     // meshphysical.glsl.js is the shader used by MeshStandardMaterial: https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderLib/meshphysical.glsl.js
     // shadowing of clouds, from https://discourse.threejs.org/t/how-to-cast-shadows-from-an-outer-sphere-to-an-inner-sphere/53732/6
@@ -274,6 +288,21 @@ let app = {
     gui.add(params.atmPowFactor, "value", 0.0, 20.0, 0.1).name("atmPowFactor")
     gui.add(params.atmMultiplier, "value", 0.0, 20.0, 0.1).name("atmMultiplier")
 
+    // Add asteroid impact controls
+    const asteroidFolder = gui.addFolder('Asteroid Impact')
+    asteroidFolder.add(params, 'asteroidSize', 1, 1500).name('Size (meters)')
+    asteroidFolder.add(params, 'asteroidSpeed', 1, 100).name('Speed (km/s)')
+    asteroidFolder.open()
+    
+    // Add orbital paths controls
+    const orbitalFolder = gui.addFolder('Orbital Paths')
+    orbitalFolder.add(params, 'showOrbitalPaths').name('Show Orbital Paths').onChange((value) => {
+      this.orbitalPaths.forEach(pathObject => {
+        pathObject.visible = value;
+      });
+    })
+    orbitalFolder.open()
+
     // Stats - show fps
     this.stats1 = new Stats()
     this.stats1.showPanel(0) // Panel 0 = fps
@@ -295,6 +324,9 @@ let app = {
 
     // Update asteroid animations
     this.updateAsteroids()
+    
+    // Update orbital path animations
+    this.updateOrbitalPaths()
 
     const shader = this.earth.material.userData.shader
     if ( shader ) {
@@ -334,59 +366,60 @@ let app = {
   },
 
   launchAsteroid(targetPosition) {
+    // Use GUI parameters for size (meters) and speed (km/s)
+    const sizeInMeters = params.asteroidSize; // 1m to 1500m
+    const speedInKmPerSec = params.asteroidSpeed; // 1 to 100 km/s
+
+    // Convert to Three.js units (Earth radius = 10 units = ~6371km)
+    // 1 unit = ~637km, so 1m = 1/637000 units
+    const asteroidRadius = (sizeInMeters / 2) / 637000;
+    // Scale up for visibility (min 0.05, max 2.0 units)
+    const visualSize = Math.max(0.05, Math.min(2.0, asteroidRadius * 50000));
+
     // Generate random asteroid properties
-    const randomSize = 0.5 + Math.random() * 0.8 // Size between 0.5 and 1.3
-    const randomDetail = Math.floor(Math.random() * 2) + 1 // Detail level 1 or 2
-    const randomColor = this.generateRandomAsteroidColor()
-    
-    // Create randomly generated asteroid geometry
-    const asteroidGeometry = new THREE.IcosahedronGeometry(randomSize, randomDetail)
-    
-    // Apply random vertex displacement for more irregular shape
-    this.deformAsteroidGeometry(asteroidGeometry, randomSize)
-    
-    // Create random asteroid material
+    const randomDetail = Math.floor(Math.random() * 2) + 1;
+    const randomColor = this.generateRandomAsteroidColor();
+    const asteroidGeometry = new THREE.IcosahedronGeometry(visualSize, randomDetail);
+    this.deformAsteroidGeometry(asteroidGeometry, visualSize);
     const asteroidMaterial = new THREE.MeshStandardMaterial({
       color: randomColor,
-      roughness: 0.8 + Math.random() * 0.2, // Roughness between 0.8-1.0
-      metalness: Math.random() * 0.3, // Metalness between 0.0-0.3
-    })
-    
-    // Create asteroid mesh with randomized properties
-    const asteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial)
-    
-    // Get target position in world coordinates
-    const targetWorldPos = this.group.localToWorld(targetPosition.clone())
-    
-    // Calculate straight perpendicular approach - from surface normal direction
-    const surfaceNormal = targetPosition.clone().normalize()
-    
-    // Start position: straight out from the surface along the normal
-    const startPosition = targetPosition.clone().add(surfaceNormal.multiplyScalar(25))
-    asteroid.position.copy(startPosition)
-    
-    // Add slight rotation to asteroid
+      roughness: 0.8 + Math.random() * 0.2,
+      metalness: Math.random() * 0.3,
+    });
+    const asteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+
+    // Calculate impact duration based on speed (faster = shorter flight time)
+    const baseDistance = 25; // units
+    const flightTime = Math.max(100, Math.min(2000, 2000 / speedInKmPerSec)); // 100ms to 2000ms
+
+    // Calculate straight perpendicular approach
+    const surfaceNormal = targetPosition.clone().normalize();
+    const startPosition = targetPosition.clone().add(surfaceNormal.multiplyScalar(baseDistance));
+    asteroid.position.copy(startPosition);
+
     asteroid.rotation.set(
       Math.random() * Math.PI,
       Math.random() * Math.PI,
       Math.random() * Math.PI
-    )
-    
+    );
+
     // Store animation properties
     asteroid.userData = {
       startPosition: startPosition.clone(),
       targetPosition: targetPosition.clone(),
       startTime: Date.now(),
-      duration: 1000, // 0.5 seconds flight time for immediate impact
+      duration: flightTime,
       rotationSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.4, // Faster rotation for more dramatic effect
+        (Math.random() - 0.5) * 0.4,
         (Math.random() - 0.5) * 0.4,
         (Math.random() - 0.5) * 0.4
-      )
-    }
-    
-    this.group.add(asteroid)
-    this.asteroids.push(asteroid)
+      ),
+      // Pass size for impact scaling
+      realSizeMeters: sizeInMeters
+    };
+
+    this.group.add(asteroid);
+    this.asteroids.push(asteroid);
   },
 
   generateRandomAsteroidColor() {
@@ -461,118 +494,504 @@ let app = {
         // Impact! Remove asteroid and create crater
         this.group.remove(asteroid)
         this.asteroids.splice(i, 1)
-        this.createImpactCrater(userData.targetPosition)
+  this.createImpactCrater(userData.targetPosition, userData.realSizeMeters, params.asteroidSpeed)
       }
     }
   },
 
-  createImpactCrater(impactPosition) {
-    // Store impact site for future reference
+  createImpactCrater(impactPosition, realSizeMeters, speed = params.asteroidSpeed) {
+    // Scale crater radius based on asteroid size (1m = 0.1, 1.5km = 3.0)
+    const craterRadius = Math.max(0.1, Math.min(3.0, realSizeMeters / 500));
     this.impactSites.push({
       position: impactPosition.clone(),
-      radius: 0.5,
+      radius: craterRadius,
       depth: 0.3
-    })
-    
+    });
     // Deform Earth geometry at impact point
-    this.deformEarth(impactPosition)
-    
+    this.deformEarth(impactPosition, craterRadius);
     // Create permanent orange impact marker
-    this.createPermanentImpactMarker(impactPosition)
-    
-    // Create impact flash effect
-    this.createImpactFlash(impactPosition)
+    this.createPermanentImpactMarker(impactPosition, craterRadius);
+    // Create impact flash effect, scale with craterRadius and speed
+    this.createImpactFlash(impactPosition, craterRadius, speed);
   },
 
-  deformEarth(impactPosition) {
-    const earthGeometry = this.earth.geometry
-    const positionAttribute = earthGeometry.attributes.position
-    const vertex = new THREE.Vector3()
-    
+  deformEarth(impactPosition, craterRadius) {
+    const earthGeometry = this.earth.geometry;
+    const positionAttribute = earthGeometry.attributes.position;
+    const vertex = new THREE.Vector3();
     // Convert impact position from group coordinates to Earth's local coordinates
-    const earthLocalImpact = this.earth.worldToLocal(this.group.localToWorld(impactPosition.clone()))
-    
+    const earthLocalImpact = this.earth.worldToLocal(this.group.localToWorld(impactPosition.clone()));
     // Deform vertices near the impact point
     for (let i = 0; i < positionAttribute.count; i++) {
-      vertex.fromBufferAttribute(positionAttribute, i)
-      
-      const distance = vertex.distanceTo(earthLocalImpact)
-      const craterRadius = 1.0
-      
+      vertex.fromBufferAttribute(positionAttribute, i);
+      const distance = vertex.distanceTo(earthLocalImpact);
       if (distance < craterRadius) {
-        // Calculate deformation strength based on distance
-        const deformationStrength = (1 - distance / craterRadius) * 0.3
-        
+        // Calculate deformation strength based on distance and crater size
+        const deformationStrength = (1 - distance / craterRadius) * Math.min(0.8, craterRadius * 0.2);
         // Pull vertex inward toward Earth center
-        const direction = vertex.clone().normalize()
-        vertex.sub(direction.multiplyScalar(deformationStrength))
-        
-        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z)
+        const direction = vertex.clone().normalize();
+        vertex.sub(direction.multiplyScalar(deformationStrength));
+        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
       }
     }
-    
-    positionAttribute.needsUpdate = true
-    earthGeometry.computeVertexNormals() // Recalculate normals for proper lighting
+    positionAttribute.needsUpdate = true;
+    earthGeometry.computeVertexNormals(); // Recalculate normals for proper lighting
   },
 
-  createPermanentImpactMarker(impactPosition) {
-    // Create permanent orange crater marker
-    const markerGeometry = new THREE.SphereGeometry(1.0, 16, 16) // Size matches crater deformation
+  createPermanentImpactMarker(impactPosition, craterRadius) {
+    // Create permanent orange crater marker scaled to impact size
+    const markerGeometry = new THREE.SphereGeometry(craterRadius, 16, 16);
     const markerMaterial = new THREE.MeshBasicMaterial({ 
       color: 0xff6600, // Bright orange
       transparent: true,
       opacity: 0.8
-    })
-    
-    const marker = new THREE.Mesh(markerGeometry, markerMaterial)
-    
+    });
+    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
     // Position marker slightly above surface at impact point
-    const surfaceNormal = impactPosition.clone().normalize()
-    const markerPosition = impactPosition.clone().add(surfaceNormal.multiplyScalar(0.05))
-    marker.position.copy(markerPosition)
-    
-    // Scale marker to be flat against the surface (flatten along the normal direction)
-    marker.scale.set(1, 1, 0.1) // Flatten along Z-axis
-    
+    const surfaceNormal = impactPosition.clone().normalize();
+    const markerPosition = impactPosition.clone().add(surfaceNormal.multiplyScalar(0.05));
+    marker.position.copy(markerPosition);
+    // Scale marker to be flat against the surface (flatten along Z-axis)
+    marker.scale.set(1, 1, 0.1);
     // Orient marker so its local Z-axis points along the surface normal (outward from sphere)
-    // Use lookAt to point the marker's forward direction along the surface normal
-    const target = markerPosition.clone().add(surfaceNormal)
-    marker.lookAt(target)
-    
+    const target = markerPosition.clone().add(surfaceNormal);
+    marker.lookAt(target);
     // Add to group so it rotates with Earth
-    this.group.add(marker)
+    this.group.add(marker);
   },
 
-  createImpactFlash(impactPosition) {
-    // Create a bright flash at impact point
-    const flashGeometry = new THREE.SphereGeometry(0.2, 8, 8)
+  createImpactFlash(impactPosition, craterRadius = 1, speed = 10) {
+    // Create a bright flash at impact point, scale with craterRadius and speed
+    // Flash size: proportional to craterRadius (asteroid size)
+    // Flash duration: proportional to sqrt(kinetic energy) for visual effect
+    // (Kinetic energy ~ 0.5 * m * v^2, but for visuals, sqrt is more pleasing)
+    const baseScale = 0.2;
+    const baseDuration = 500; // ms
+    const scaleFactor = Math.max(1, craterRadius * 1.2); // craterRadius in km, scale up
+    const speedFactor = Math.max(1, speed / 10); // speed in km/s, normalized
+    const initialScale = baseScale * scaleFactor;
+    const finalScale = initialScale * 2.5;
+    // Duration: baseDuration * sqrt(scaleFactor * speedFactor)
+    const duration = baseDuration * Math.sqrt(scaleFactor * speedFactor);
+
+    const flashGeometry = new THREE.SphereGeometry(1, 16, 16);
     const flashMaterial = new THREE.MeshBasicMaterial({ 
       color: 0xffaa00,
       transparent: true,
       opacity: 1
-    })
+    });
     
-    const flash = new THREE.Mesh(flashGeometry, flashMaterial)
-    const surfacePosition = impactPosition.clone().normalize().multiplyScalar(10.1)
-    flash.position.copy(surfacePosition)
+    const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+    const surfacePosition = impactPosition.clone().normalize().multiplyScalar(10.1);
+    flash.position.copy(surfacePosition);
     
-    this.group.add(flash)
+    this.group.add(flash);
     
-    // Animate flash fadeout
-    const startTime = Date.now()
+    flash.scale.set(initialScale, initialScale, initialScale);
+    const startTime = Date.now();
     const fadeOut = () => {
-      const elapsed = Date.now() - startTime
-      const progress = elapsed / 500 // 500ms fade
-      
-      if (progress < 1) {
-        flash.material.opacity = 1 - progress
-        flash.scale.setScalar(1 + progress * 2)
-        requestAnimationFrame(fadeOut)
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const scale = initialScale + (finalScale - initialScale) * t;
+      flash.scale.set(scale, scale, scale);
+      flash.material.opacity = 1 - t;
+      if (t < 1) {
+        requestAnimationFrame(fadeOut);
       } else {
-        this.group.remove(flash)
+        this.group.remove(flash);
+        flash.geometry.dispose();
+        flash.material.dispose();
       }
+    };
+    fadeOut();
+  },
+
+  async createOrbitalPaths() {
+    console.log('Starting to create orbital paths using imported data...');
+    try {
+      // Use the imported asteroid data directly
+      const asteroidData = asteroidOrbitData;
+      console.log('Using imported asteroid data:', Object.keys(asteroidData).length, 'asteroids');
+      
+      // Process the imported data
+      this.processAsteroidData(asteroidData);
+      
+    } catch (importError) {
+      console.warn('Could not use imported asteroid data:', importError);
+      console.log('Creating fallback orbital paths...');
+      
+      // Create some fallback orbital paths if import fails
+      this.createFallbackOrbits();
     }
-    fadeOut()
+  },
+
+  processAsteroidData(asteroidData) {
+    console.log('Processing asteroid data...');
+    
+    // First, create a test sphere to make sure we can see things
+    console.log('Creating test sphere at distance 30...');
+    const testSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(3, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    );
+    testSphere.position.set(30, 0, 0);
+    this.group.add(testSphere);
+    this.orbitalPaths.push(testSphere);
+    
+    // Much larger scale factor to make orbits very visible
+    const scaleFactor = 0.02; // Much larger scale factor
+    const earthRadius = 10; // Our Earth radius in Three.js units
+    const minOrbitRadius = earthRadius + 50; // Much larger minimum distance from Earth surface
+    
+    // Bright neon color palette for different orbital paths
+    const colors = [
+      0x00ff00, 0xff0080, 0x00ffff, 0xffff00, 0xff4000,
+      0x8000ff, 0xff8000, 0x0080ff, 0xff00ff, 0x40ff00
+    ];
+    
+    let colorIndex = 0;
+    let pathCount = 0;
+    const maxPaths = 10; // Show more asteroid orbits
+    
+    // Process real asteroid data
+    console.log(`Starting to process ${Object.keys(asteroidData).length} asteroids...`);
+    
+    for (const [asteroidName, coordinates] of Object.entries(asteroidData)) {
+      if (pathCount >= maxPaths) break;
+      
+      console.log(`\n--- Processing asteroid ${pathCount + 1}/${maxPaths}: ${asteroidName} ---`);
+      console.log(`Raw coordinates length: ${coordinates.length}`);
+      
+      // Sample every 5th coordinate for smoother paths
+      const sampledCoords = coordinates.filter((_, index) => index % 5 === 0);
+      console.log(`Sampled coordinates: ${sampledCoords.length} points`);
+      
+      if (sampledCoords.length < 5) {
+        console.log(`Skipping ${asteroidName} - too few points (${sampledCoords.length} < 5)`);
+        continue;
+      }
+      
+      // Convert coordinates and scale them
+      const pathPoints = sampledCoords.map((coord, index) => {
+        if (!Array.isArray(coord) || coord.length < 3) {
+          console.warn(`Invalid coordinate at index ${index}:`, coord);
+          return null;
+        }
+        
+        const [x, y, z] = coord;
+        
+        // Scale down the coordinates
+        let scaledX = x * scaleFactor;
+        let scaledY = y * scaleFactor;
+        let scaledZ = z * scaleFactor;
+        
+        // Calculate distance from origin and ensure minimum distance
+        const distance = Math.sqrt(scaledX * scaledX + scaledY * scaledY + scaledZ * scaledZ);
+        if (distance < minOrbitRadius) {
+          const ratio = minOrbitRadius / distance;
+          scaledX *= ratio;
+          scaledY *= ratio;
+          scaledZ *= ratio;
+        }
+        
+        return new THREE.Vector3(scaledX, scaledY, scaledZ);
+      }).filter(point => point !== null);
+      
+      console.log(`Created ${pathPoints.length} valid path points for ${asteroidName}`);
+      console.log(`Sample points:`, pathPoints.slice(0, 3).map(p => `(${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`));
+      console.log(`Distance from origin (first point): ${pathPoints[0].length().toFixed(1)} units`);
+      
+      // Create the orbital path geometry
+      const pathGeometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
+      
+      // Use LineBasicMaterial with maximum visibility settings
+      const pathMaterial = new THREE.LineBasicMaterial({ 
+        color: colors[colorIndex % colors.length],
+        transparent: false,
+        opacity: 1.0,
+        linewidth: 50 // Much thicker lines
+      });
+      
+      console.log(`Creating line with color: 0x${colors[colorIndex % colors.length].toString(16)}`);
+      
+      const orbitLine = new THREE.Line(pathGeometry, pathMaterial);
+      
+      // Create visible spheres at each path point for debugging
+      pathPoints.forEach((point, index) => {
+        if (index % 5 === 0) { // Every 5th point
+          const sphereGeometry = new THREE.SphereGeometry(2, 8, 8);
+          const sphereMaterial = new THREE.MeshBasicMaterial({
+            color: colors[colorIndex % colors.length],
+            transparent: true,
+            opacity: 0.8
+          });
+          const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+          sphere.position.copy(point);
+          this.group.add(sphere);
+          this.orbitalPaths.push(sphere);
+        }
+      });
+      
+      // Create a tube geometry for much better visibility
+      const curve = new THREE.CatmullRomCurve3(pathPoints, true);
+      const tubeGeometry = new THREE.TubeGeometry(curve, pathPoints.length, 1.5, 8, true);
+      const tubeMaterial = new THREE.MeshBasicMaterial({
+        color: colors[colorIndex % colors.length],
+        wireframe: true,
+        transparent: true,
+        opacity: 0.8
+      });
+      const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+      this.group.add(tube);
+      this.orbitalPaths.push(tube);
+      
+      // Add glow effect by creating a second, thicker line behind
+      const glowMaterial = new THREE.LineBasicMaterial({
+        color: colors[colorIndex % colors.length],
+        transparent: false,
+        opacity: 1.0,
+        linewidth: 100 // Much thicker glow
+      });
+      const glowLine = new THREE.Line(pathGeometry.clone(), glowMaterial);
+      
+      // Add userData to both lines to prevent errors
+      glowLine.userData = {
+        asteroidName: asteroidName + '_glow',
+        isGlow: true
+      };
+      
+      orbitLine.userData = {
+        asteroidName: asteroidName,
+        originalPoints: pathPoints,
+        currentIndex: 0,
+        speed: 0.2 + Math.random() * 0.3 // Random speed for variety
+      };
+      
+      // Add to scene and array
+      console.log(`✓ Successfully added orbital path for ${asteroidName} with ${pathPoints.length} points`);
+      console.log(`  Color: 0x${colors[colorIndex % colors.length].toString(16)}`);
+      this.group.add(glowLine); // Add glow effect first (behind)
+      this.group.add(orbitLine);
+      this.orbitalPaths.push(orbitLine);
+      this.orbitalPaths.push(glowLine);
+      
+      // Create a larger moving asteroid on this orbit
+      this.createOrbitingAsteroid(pathPoints, colors[colorIndex % colors.length], asteroidName);
+      
+      colorIndex++;
+      pathCount++;
+    }
+    
+    console.log(`\n=== ORBITAL PATHS SUMMARY ===`);
+    console.log(`Created ${pathCount} asteroid orbits out of ${Object.keys(asteroidData).length} available`);
+    console.log(`Total orbital elements: ${this.orbitalPaths.length} (paths + glows + asteroids)`);
+    console.log(`Camera position: x=${camera.position.x}, y=${camera.position.y}, z=${camera.position.z}`);
+    console.log(`Earth group position: x=${this.group.position.x}, y=${this.group.position.y}, z=${this.group.position.z}`);
+    console.log('Orbital paths should now be visible around Earth with neon colors');
+    console.log('Use mouse to orbit around and zoom in/out to find the orbital paths');
+    console.log('================================\n');
+  },
+
+  createFallbackOrbits() {
+    console.log('Creating fallback orbital paths...');
+    
+    const colors = [0x00ff00, 0xff0080, 0x00ffff, 0xffff00, 0xff4000];
+    
+    for (let i = 0; i < 5; i++) {
+      const radius = 20 + i * 8;
+      const points = [];
+      const numPoints = 60;
+      
+      for (let j = 0; j < numPoints; j++) {
+        const angle = (j / numPoints) * Math.PI * 2;
+        // Create elliptical orbits with different inclinations
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius * (0.7 + i * 0.1);
+        const z = Math.sin(angle + i) * (5 + i * 3);
+        points.push(new THREE.Vector3(x, y, z));
+      }
+      
+      // Create orbital path
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({
+        color: colors[i],
+        transparent: true,
+        opacity: 1.0,
+        linewidth: 12
+      });
+      
+      const line = new THREE.Line(geometry, material);
+      line.userData = {
+        asteroidName: `FallbackOrbit${i + 1}`,
+        isFallbackOrbit: true
+      };
+      console.log(`Adding fallback orbit ${i + 1}`);
+      this.group.add(line);
+      this.orbitalPaths.push(line);
+      
+      // Add a moving asteroid
+      const asteroid = new THREE.Mesh(
+        new THREE.SphereGeometry(0.6, 8, 8),
+        new THREE.MeshStandardMaterial({
+          color: colors[i],
+          emissive: colors[i],
+          emissiveIntensity: 0.4
+        })
+      );
+      asteroid.position.copy(points[0]);
+      asteroid.userData = {
+        pathPoints: points,
+        currentIndex: 0,
+        speed: 0.3 + i * 0.1,
+        name: `FallbackAsteroid${i + 1}`,
+        rotationSpeed: {
+          x: (Math.random() - 0.5) * 0.02,
+          y: (Math.random() - 0.5) * 0.02,
+          z: (Math.random() - 0.5) * 0.02
+        }
+      };
+      this.group.add(asteroid);
+      this.orbitalPaths.push(asteroid);
+    }
+    
+    console.log('Fallback orbits created successfully');
+  },
+
+  createTestOrbit(color) {
+    console.log('Creating simple test orbit...');
+    
+    // Create a simple circular orbit around Earth
+    const testPoints = [];
+    const radius = 25; // Distance from Earth center
+    const numPoints = 50;
+    
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 2;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      const z = Math.sin(angle * 2) * 5; // Add some vertical variation
+      testPoints.push(new THREE.Vector3(x, y, z));
+    }
+    
+    // Create the test orbital path
+    const testGeometry = new THREE.BufferGeometry().setFromPoints(testPoints);
+    const testMaterial = new THREE.LineBasicMaterial({ 
+      color: color,
+      transparent: true,
+      opacity: 1.0,
+      linewidth: 15
+    });
+    
+    const testLine = new THREE.Line(testGeometry, testMaterial);
+    testLine.userData = {
+      asteroidName: 'TestOrbit',
+      isTestOrbit: true
+    };
+    console.log('Adding test orbit to scene');
+    this.group.add(testLine);
+    this.orbitalPaths.push(testLine);
+    
+    // Create a test asteroid
+    const testAsteroid = new THREE.Mesh(
+      new THREE.SphereGeometry(0.8, 8, 8),
+      new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.3
+      })
+    );
+    testAsteroid.position.copy(testPoints[0]);
+    testAsteroid.userData = {
+      pathPoints: testPoints,
+      currentIndex: 0,
+      speed: 0.5,
+      name: 'TestAsteroid',
+      rotationSpeed: {
+        x: 0.01,
+        y: 0.02,
+        z: 0.01
+      }
+    };
+    this.group.add(testAsteroid);
+    this.orbitalPaths.push(testAsteroid);
+  },
+
+  createOrbitingAsteroid(pathPoints, color, name) {
+    // Create a larger, more visible asteroid that moves along the orbital path
+    const asteroidGeometry = new THREE.IcosahedronGeometry(0.8, 1); // Increased size from 0.4 to 0.8
+    const asteroidMaterial = new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.3,
+      metalness: 0.7,
+      emissive: color,
+      emissiveIntensity: 0.4 // Increased from 0.2 to 0.4
+    });
+    
+    const orbitingAsteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+    orbitingAsteroid.userData = {
+      pathPoints: pathPoints,
+      currentIndex: 0,
+      speed: 0.3 + Math.random() * 0.5,
+      name: name,
+      rotationSpeed: {
+        x: (Math.random() - 0.5) * 0.02,
+        y: (Math.random() - 0.5) * 0.02,
+        z: (Math.random() - 0.5) * 0.02
+      }
+    };
+    
+    // Set initial position
+    if (pathPoints.length > 0) {
+      orbitingAsteroid.position.copy(pathPoints[0]);
+    }
+    
+    this.group.add(orbitingAsteroid);
+    this.orbitalPaths.push(orbitingAsteroid); // Store with paths for updating
+  },
+
+  updateOrbitalPaths() {
+    this.orbitalPaths.forEach(pathObject => {
+      // Check if the object and its userData exist
+      if (!pathObject || !pathObject.userData) {
+        return; // Skip this object if it doesn't have userData
+      }
+      
+      // Only update objects that have path movement (asteroids, not lines)
+      if (pathObject.userData.pathPoints) {
+        const userData = pathObject.userData;
+        const pathPoints = userData.pathPoints;
+        
+        if (pathPoints && pathPoints.length > 1) {
+          // Update position along path
+          userData.currentIndex += userData.speed;
+          
+          // Wrap around when reaching end of path
+          if (userData.currentIndex >= pathPoints.length) {
+            userData.currentIndex = 0;
+          }
+          
+          // Interpolate between path points for smooth movement
+          const currentIdx = Math.floor(userData.currentIndex) % pathPoints.length;
+          const nextIdx = (currentIdx + 1) % pathPoints.length;
+          const t = userData.currentIndex - Math.floor(userData.currentIndex);
+          
+          const currentPoint = pathPoints[currentIdx];
+          const nextPoint = pathPoints[nextIdx];
+          
+          // Check if both points exist before trying to interpolate
+          if (currentPoint && nextPoint) {
+            pathObject.position.lerpVectors(currentPoint, nextPoint, t);
+          }
+          
+          // Rotate the asteroid if it has rotation speed
+          if (userData.rotationSpeed) {
+            pathObject.rotation.x += userData.rotationSpeed.x;
+            pathObject.rotation.y += userData.rotationSpeed.y;
+            pathObject.rotation.z += userData.rotationSpeed.z;
+          }
+        }
+      }
+    });
   }
 }
 
