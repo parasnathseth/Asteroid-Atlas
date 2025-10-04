@@ -332,14 +332,16 @@ let app = {
     // Create asteroid mesh
     const asteroid = new THREE.Mesh(this.asteroidGeometry, this.asteroidMaterial)
     
-    // Start position: closer to Earth but still visible from camera
-    const startDirection = new THREE.Vector3(
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 2, 
-      (Math.random() - 0.5) * 2
-    ).normalize()
-    const startPosition = startDirection.multiplyScalar(25) // Start closer (25 units away)
-    asteroid.position.copy(startPosition)
+    // Calculate direction from target toward camera for direct approach
+    const targetWorldPos = this.group.localToWorld(targetPosition.clone())
+    const cameraDirection = camera.position.clone().sub(targetWorldPos).normalize()
+    
+    // Start position: along the camera-to-target line, but further back
+    const startPosition = targetWorldPos.clone().add(cameraDirection.multiplyScalar(25))
+    
+    // Convert back to group local coordinates
+    const localStartPosition = this.group.worldToLocal(startPosition)
+    asteroid.position.copy(localStartPosition)
     
     // Add slight rotation to asteroid
     asteroid.rotation.set(
