@@ -63,11 +63,22 @@ let camera = createCamera(45, 1, 1000, { x: 0, y: 0, z: 30 })
  * initScene() is called after a basic threejs environment has been set up, you can add objects/lighting to you scene in initScene()
  * if your app needs to animate things(i.e. not static), include a updateScene(interval, elapsed) function in the app as well
  *************************************************/
+// Raycaster for mouse interaction
+let raycaster = new THREE.Raycaster()
+let mouse = new THREE.Vector2()
+
 let app = {
   async initScene() {
     // OrbitControls
     this.controls = new OrbitControls(camera, renderer.domElement)
     this.controls.enableDamping = true
+    
+    // Array to store all dots placed on the sphere
+    this.dots = []
+    
+    // Initialize asteroid system arrays
+    this.asteroids = []
+    this.impactSites = []
 
     // adding a virtual sun using directional light
     this.dirLight = new THREE.DirectionalLight(0xffffff, params.sunIntensity)
@@ -99,6 +110,14 @@ let app = {
     await updateLoadingProgressBar(0.7)
     
     scene.background = envMap
+
+    // Create asteroid geometry and material for impact effects
+    this.asteroidGeometry = new THREE.IcosahedronGeometry(0.8, 1) // Larger irregular rocky shape
+    this.asteroidMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x666666, // Lighter gray for better visibility
+      roughness: 0.9,
+      metalness: 0.1
+    })
 
     // create group for easier manipulation of objects(ie later with clouds and atmosphere added)
     this.group = new THREE.Group()
@@ -148,6 +167,9 @@ let app = {
     this.group.add(this.atmos)
 
     scene.add(this.group)
+
+    // Add mouse double-click event listener
+    renderer.domElement.addEventListener('dblclick', (event) => this.onMouseClick(event))
 
     // meshphysical.glsl.js is the shader used by MeshStandardMaterial: https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderLib/meshphysical.glsl.js
     // shadowing of clouds, from https://discourse.threejs.org/t/how-to-cast-shadows-from-an-outer-sphere-to-an-inner-sphere/53732/6
@@ -266,6 +288,9 @@ let app = {
     this.earth.rotateY(interval * 0.005 * params.speedFactor)
     this.clouds.rotateY(interval * 0.01 * params.speedFactor)
 
+    // Update asteroid animations
+    this.updateAsteroids()
+
     const shader = this.earth.material.userData.shader
     if ( shader ) {
       // As for each n radians Point X has rotated, Point Y would have rotated 2n radians.
@@ -277,6 +302,171 @@ let app = {
       let offset = (interval * 0.005 * params.speedFactor) / (2 * Math.PI)
       shader.uniforms.uv_xOffset.value += offset % 1
     }
+  },
+
+  onMouseClick(event) {
+    // Convert mouse coordinates to normalized device coordinates (-1 to +1)
+    const rect = renderer.domElement.getBoundingClientRect()
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+    // Update the raycaster with the camera and mouse position
+    raycaster.setFromCamera(mouse, camera)
+
+    // Check for intersections with the earth sphere
+    const intersects = raycaster.intersectObject(this.earth)
+    
+    if (intersects.length > 0) {
+      // Get the intersection point in world coordinates
+      const worldIntersectionPoint = intersects[0].point
+      
+      // Convert world coordinates to local coordinates relative to the group
+      const localIntersectionPoint = this.group.worldToLocal(worldIntersectionPoint.clone())
+      
+      // Launch an asteroid toward the impact point
+      this.launchAsteroid(localIntersectionPoint)
+    }
+  },
+
+  launchAsteroid(targetPosition) {
+    // Create asteroid mesh
+    const asteroid = new THREE.Mesh(this.asteroidGeometry, this.asteroidMaterial)
+    
+    // Start position: closer to Earth but still visible from camera
+    const startDirection = new THREE.Vector3(
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2, 
+      (Math.random() - 0.5) * 2
+    ).normalize()
+    const startPosition = startDirection.multiplyScalar(25) // Start closer (25 units away)
+    asteroid.position.copy(startPosition)
+    
+    // Add slight rotation to asteroid
+    asteroid.rotation.set(
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+      Math.random() * Math.PI
+    )
+    
+    // Store animation properties
+    asteroid.userData = {
+      startPosition: startPosition.clone(),
+      targetPosition: targetPosition.clone(),
+      startTime: Date.now(),
+      duration: 2000, // 2 seconds flight time
+      rotationSpeed: new THREE.Vector3(
+        (Math.random() - 0.5) * 0.2,
+        (Math.random() - 0.5) * 0.2,
+        (Math.random() - 0.5) * 0.2
+      )
+    }
+    
+    this.group.add(asteroid)
+    this.asteroids.push(asteroid)
+  },
+
+  updateAsteroids() {
+    const currentTime = Date.now()
+    
+    for (let i = this.asteroids.length - 1; i >= 0; i--) {
+      const asteroid = this.asteroids[i]
+      const userData = asteroid.userData
+      const elapsed = currentTime - userData.startTime
+      const progress = Math.min(elapsed / userData.duration, 1)
+      
+      if (progress < 1) {
+        // Animate asteroid position
+        asteroid.position.lerpVectors(userData.startPosition, userData.targetPosition, progress)
+        
+        // Rotate asteroid
+        asteroid.rotation.x += userData.rotationSpeed.x
+        asteroid.rotation.y += userData.rotationSpeed.y
+        asteroid.rotation.z += userData.rotationSpeed.z
+      } else {
+        // Impact! Remove asteroid and create crater
+        this.group.remove(asteroid)
+        this.asteroids.splice(i, 1)
+        this.createImpactCrater(userData.targetPosition)
+      }
+    }
+  },
+
+  createImpactCrater(impactPosition) {
+    // Store impact site for future reference
+    this.impactSites.push({
+      position: impactPosition.clone(),
+      radius: 0.5,
+      depth: 0.3
+    })
+    
+    // Deform Earth geometry at impact point
+    this.deformEarth(impactPosition)
+    
+    // Create impact flash effect
+    this.createImpactFlash(impactPosition)
+  },
+
+  deformEarth(impactPosition) {
+    const earthGeometry = this.earth.geometry
+    const positionAttribute = earthGeometry.attributes.position
+    const vertex = new THREE.Vector3()
+    
+    // Convert impact position from group coordinates to Earth's local coordinates
+    const earthLocalImpact = this.earth.worldToLocal(this.group.localToWorld(impactPosition.clone()))
+    
+    // Deform vertices near the impact point
+    for (let i = 0; i < positionAttribute.count; i++) {
+      vertex.fromBufferAttribute(positionAttribute, i)
+      
+      const distance = vertex.distanceTo(earthLocalImpact)
+      const craterRadius = 1.0
+      
+      if (distance < craterRadius) {
+        // Calculate deformation strength based on distance
+        const deformationStrength = (1 - distance / craterRadius) * 0.3
+        
+        // Pull vertex inward toward Earth center
+        const direction = vertex.clone().normalize()
+        vertex.sub(direction.multiplyScalar(deformationStrength))
+        
+        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z)
+      }
+    }
+    
+    positionAttribute.needsUpdate = true
+    earthGeometry.computeVertexNormals() // Recalculate normals for proper lighting
+  },
+
+  createImpactFlash(impactPosition) {
+    // Create a bright flash at impact point
+    const flashGeometry = new THREE.SphereGeometry(0.2, 8, 8)
+    const flashMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xffaa00,
+      transparent: true,
+      opacity: 1
+    })
+    
+    const flash = new THREE.Mesh(flashGeometry, flashMaterial)
+    const surfacePosition = impactPosition.clone().normalize().multiplyScalar(10.1)
+    flash.position.copy(surfacePosition)
+    
+    this.group.add(flash)
+    
+    // Animate flash fadeout
+    const startTime = Date.now()
+    const fadeOut = () => {
+      const elapsed = Date.now() - startTime
+      const progress = elapsed / 500 // 500ms fade
+      
+      if (progress < 1) {
+        flash.material.opacity = 1 - progress
+        flash.scale.setScalar(1 + progress * 2)
+        requestAnimationFrame(fadeOut)
+      } else {
+        this.group.remove(flash)
+      }
+    }
+    fadeOut()
   }
 }
 
