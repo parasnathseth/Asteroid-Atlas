@@ -15,7 +15,7 @@ import * as THREE from "three"
 export function latLonToVector3(lat, lon, radius = 10) {
   // Convert latitude and longitude to radians
   const latRad = lat * Math.PI / 180;
-  const lonRad = -lon * Math.PI / 180; // Try negating longitude
+  const lonRad = -lon * Math.PI / 180; // Negate longitude
   
   // Standard spherical to Cartesian conversion
   const x = radius * Math.cos(latRad) * Math.cos(lonRad);

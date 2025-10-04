@@ -46,6 +46,12 @@ const params = {
   atmOpacity: { value: 0.7 },
   atmPowFactor: { value: 4.1 },
   atmMultiplier: { value: 9.5 },
+  // lighting params
+  ambientIntensity: 0.6, // ambient light intensity
+  hemisphereIntensity: 0.4, // hemisphere light intensity
+  // navigation params
+  cameraDistance: 25, // distance from Earth when viewing location
+  animationSpeed: 1000, // animation duration in milliseconds
   // coordinate system params
   showLocationMarkers: true,
   showLocationLabels: true,
@@ -92,6 +98,14 @@ let app = {
     this.dirLight = new THREE.DirectionalLight(0xffffff, params.sunIntensity)
     this.dirLight.position.set(-50, 0, 30)
     scene.add(this.dirLight)
+
+    // Add ambient light to illuminate the entire Earth evenly
+    this.ambientLight = new THREE.AmbientLight(0xffffff, params.ambientIntensity)
+    scene.add(this.ambientLight)
+
+    // Add hemisphere light for more natural lighting
+    this.hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, params.hemisphereIntensity)
+    scene.add(this.hemisphereLight)
 
     // updates the progress bar to 10% on the loading UI
     await updateLoadingProgressBar(0.1)
@@ -268,6 +282,12 @@ let app = {
     gui.add(params, "sunIntensity", 0.0, 5.0, 0.1).onChange((val) => {
       this.dirLight.intensity = val
     }).name("Sun Intensity")
+    gui.add(params, "ambientIntensity", 0.0, 2.0, 0.1).onChange((val) => {
+      this.ambientLight.intensity = val
+    }).name("Ambient Light")
+    gui.add(params, "hemisphereIntensity", 0.0, 1.0, 0.1).onChange((val) => {
+      this.hemisphereLight.intensity = val
+    }).name("Hemisphere Light")
     gui.add(params, "metalness", 0.0, 1.0, 0.05).onChange((val) => {
       earthMat.metalness = val
     }).name("Ocean Metalness")
@@ -294,12 +314,17 @@ let app = {
       this.updateTargetLocation()
     }).name("Target Longitude")
     
+    // Navigation controls
+    coordFolder.add(params, "cameraDistance", 15, 50, 1).name("Camera Distance")
+    coordFolder.add(params, "animationSpeed", 500, 3000, 100).name("Animation Speed (ms)")
+    
     // Add buttons for famous locations
     const locationActions = {
       'Go to New York': () => this.goToLocation(40.7128, -74.0060),
       'Go to London': () => this.goToLocation(51.5074, -0.1278),
       'Go to Tokyo': () => this.goToLocation(35.6762, 139.6503),
       'Go to Sydney': () => this.goToLocation(-33.8688, 151.2093),
+      'Go to Target': () => this.goToLocation(params.targetLat, params.targetLon),
       'Clear Markers': () => this.clearCustomMarkers()
     }
     
@@ -462,12 +487,68 @@ let app = {
 
   // Go to a specific location
   goToLocation(lat, lon) {
+    console.log(`goToLocation called with: ${lat}, ${lon}`)
+    
     params.targetLat = lat
     params.targetLon = lon
     this.updateTargetLocation()
     
     // Update coordinate display
     this.updateCoordinateDisplay(lat, lon)
+    
+    // Move camera to view the location
+    this.moveCameraToLocation(lat, lon)
+  },
+
+  // Move camera to view a specific location
+  moveCameraToLocation(lat, lon) {
+    // For navigation, use the same coordinate system as the visual markers
+    // The issue might be elsewhere in the camera positioning logic
+    const targetPosition = latLonToVector3(lat, lon, 10)
+    
+    // Debug logging
+    console.log(`Moving camera to: ${lat}, ${lon}`)
+    console.log(`Target position:`, targetPosition)
+    
+    // Calculate camera position - move camera back from the target point
+    const cameraDirection = targetPosition.clone().normalize()
+    const cameraPosition = cameraDirection.multiplyScalar(params.cameraDistance)
+    
+    console.log(`Camera position:`, cameraPosition)
+    
+    // Smoothly animate camera to new position
+    if (this.controls) {
+      // Set the target (what the camera looks at) to the location on Earth
+      this.controls.target.copy(targetPosition)
+      
+      // Animate camera position
+      const startPos = camera.position.clone()
+      const endPos = cameraPosition
+      
+      // Simple animation using requestAnimationFrame
+      let animationProgress = 0
+      const startTime = Date.now()
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime
+        animationProgress = Math.min(elapsed / params.animationSpeed, 1)
+        
+        // Smooth easing function
+        const ease = 1 - Math.pow(1 - animationProgress, 3)
+        
+        // Interpolate camera position
+        camera.position.lerpVectors(startPos, endPos, ease)
+        
+        // Update controls
+        this.controls.update()
+        
+        if (animationProgress < 1) {
+          requestAnimationFrame(animate)
+        }
+      }
+      
+      animate()
+    }
   },
 
   // Update target location marker
@@ -540,6 +621,8 @@ window.goToInputCoordinates = function() {
   const lat = parseFloat(document.getElementById('lat-input').value)
   const lon = parseFloat(document.getElementById('lon-input').value)
   
+  console.log(`HTML Input: lat=${lat}, lon=${lon}`)
+  
   if (isNaN(lat) || isNaN(lon)) {
     alert('Please enter valid latitude and longitude values')
     return
@@ -555,6 +638,7 @@ window.goToInputCoordinates = function() {
     return
   }
   
+  console.log(`Calling goToLocation with: ${lat}, ${lon}`)
   window.appInstance.goToLocation(lat, lon)
   
   // Also update the GUI sliders
