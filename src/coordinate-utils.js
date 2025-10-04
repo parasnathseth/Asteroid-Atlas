@@ -165,41 +165,157 @@ export function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Get the country/region name for given coordinates (simplified lookup)
- * This is a basic implementation - for production use, consider using a proper geocoding service
+ * Get the country/region name for given coordinates using reverse geocoding API
+ * Falls back to basic region detection if API fails
  * @param {number} lat - Latitude in degrees
  * @param {number} lon - Longitude in degrees
- * @returns {string} Approximate region name
+ * @returns {Promise<string>} Country or region name
  */
-export function getRegionName(lat, lon) {
-  // Very basic region detection based on coordinate ranges
-  if (lat > 66.5) return "Arctic";
-  if (lat < -66.5) return "Antarctic";
-  
-  if (lon >= -180 && lon < -60) {
-    if (lat > 45) return "North America";
-    if (lat > 20) return "United States";
-    if (lat > -10) return "Central America";
-    return "South America";
+export async function getRegionName(lat, lon) {
+  try {
+    // Use free reverse geocoding API (no API key required)
+    const response = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,
+      { 
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        }
+      }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      
+      // Extract location information in order of preference
+      if (data.countryName) {
+        // Add more detail if available
+        let location = data.countryName;
+        
+        if (data.principalSubdivision && data.principalSubdivision !== data.countryName) {
+          location = `${data.principalSubdivision}, ${data.countryName}`;
+        } else if (data.city && data.city !== data.countryName) {
+          location = `${data.city}, ${data.countryName}`;
+        }
+        
+        return location;
+      }
+      
+      // Fallback to locality if country not found
+      if (data.locality) return data.locality;
+    }
+  } catch (error) {
+    console.warn('Reverse geocoding failed, using fallback detection:', error.message);
   }
   
-  if (lon >= -60 && lon < 20) {
+  // Fallback to basic geographic detection if API fails
+  return getBasicRegionName(lat, lon);
+}
+
+/**
+ * Basic fallback region detection when API is unavailable
+ * @param {number} lat - Latitude in degrees
+ * @param {number} lon - Longitude in degrees
+ * @returns {string} Basic region name
+ */
+function getBasicRegionName(lat, lon) {
+  // Normalize longitude
+  let normalizedLon = lon;
+  while (normalizedLon > 180) normalizedLon -= 360;
+  while (normalizedLon < -180) normalizedLon += 360;
+  
+  // Polar regions
+  if (lat > 66.5) return "Arctic Region";
+  if (lat < -66.5) return "Antarctica";
+  
+  // Basic continental detection
+  if (normalizedLon >= -168 && normalizedLon <= -52) {
+    // Americas
+    if (lat > 48) return "Northern North America";
+    if (lat > 23) return "United States/Canada";
+    if (lat > 7) return "Mexico/Central America"; 
+    if (lat > -56) return "South America";
+  }
+  
+  if (normalizedLon >= -52 && normalizedLon <= 40) {
+    // Europe/Africa/Atlantic
     if (lat > 35) return "Europe";
-    if (lat > 0) return "Africa (North)";
-    return "Africa (South)";
+    if (lat > -35) return "Africa";
+    return "South Atlantic";
   }
   
-  if (lon >= 20 && lon < 140) {
-    if (lat > 50) return "Russia/Siberia";
-    if (lat > 25) return "Asia (Central)";
-    if (lat > -10) return "Asia (South)";
-    return "Australia/Oceania";
+  if (normalizedLon >= 40 && normalizedLon <= 180) {
+    // Asia/Oceania/Pacific
+    if (lat > 50) return "Northern Asia";
+    if (lat > 10) return "Asia";
+    if (lat > -50) return "Southeast Asia/Oceania";
+    return "Southern Ocean";
   }
   
-  if (lon >= 140 && lon <= 180) {
-    if (lat > 20) return "East Asia";
-    return "Pacific";
+  // Ocean fallbacks
+  if (Math.abs(lat) < 60) {
+    if (normalizedLon > 120 || normalizedLon < -120) return "Pacific Ocean";
+    if (normalizedLon > -40 && normalizedLon < 40) return "Atlantic/Europe/Africa";
+    return "Indian Ocean";
   }
   
   return "Unknown Region";
+}
+
+/**
+ * Get detailed location information with caching
+ * @param {number} lat - Latitude in degrees
+ * @param {number} lon - Longitude in degrees
+ * @returns {Promise<object>} Detailed location object
+ */
+export async function getDetailedLocation(lat, lon) {
+  const cacheKey = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+  
+  // Check if we have cached data (simple in-memory cache)
+  if (typeof window !== 'undefined' && window.locationCache && window.locationCache[cacheKey]) {
+    return window.locationCache[cacheKey];
+  }
+  
+  try {
+    const response = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      
+      const locationInfo = {
+        country: data.countryName || 'Unknown',
+        region: data.principalSubdivision || '',
+        city: data.city || '',
+        locality: data.locality || '',
+        continent: data.continent || '',
+        formatted: data.countryName || getBasicRegionName(lat, lon),
+        coordinates: { lat, lon },
+        source: 'API'
+      };
+      
+      // Cache the result
+      if (typeof window !== 'undefined') {
+        if (!window.locationCache) window.locationCache = {};
+        window.locationCache[cacheKey] = locationInfo;
+      }
+      
+      return locationInfo;
+    }
+  } catch (error) {
+    console.warn('Detailed location lookup failed:', error.message);
+  }
+  
+  // Fallback
+  return {
+    country: getBasicRegionName(lat, lon),
+    region: '',
+    city: '',
+    locality: '',
+    continent: '',
+    formatted: getBasicRegionName(lat, lon),
+    coordinates: { lat, lon },
+    source: 'Fallback'
+  };
 }

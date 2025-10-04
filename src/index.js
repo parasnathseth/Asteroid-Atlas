@@ -442,19 +442,36 @@ let app = {
   },
 
   // Update coordinate display
-  updateCoordinateDisplay(lat, lon, position) {
+  async updateCoordinateDisplay(lat, lon, position) {
     const latStr = `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? 'N' : 'S'}`
     const lonStr = `${Math.abs(lon).toFixed(4)}°${lon >= 0 ? 'E' : 'W'}`
-    const region = getRegionName(lat, lon)
     
     // Debug logging
     console.log(`Clicked coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)}`)
     
+    // Show loading state first
     this.coordInfoDiv.innerHTML = `
       <strong>Latitude:</strong> ${latStr}<br>
       <strong>Longitude:</strong> ${lonStr}<br>
-      <strong>Region:</strong> ${region}
+      <strong>Region:</strong> <span style="color: #888;">Loading...</span>
     `
+    
+    // Get location asynchronously
+    try {
+      const region = await getRegionName(lat, lon)
+      this.coordInfoDiv.innerHTML = `
+        <strong>Latitude:</strong> ${latStr}<br>
+        <strong>Longitude:</strong> ${lonStr}<br>
+        <strong>Region:</strong> ${region}
+      `
+    } catch (error) {
+      console.warn('Failed to get region name:', error)
+      this.coordInfoDiv.innerHTML = `
+        <strong>Latitude:</strong> ${latStr}<br>
+        <strong>Longitude:</strong> ${lonStr}<br>
+        <strong>Region:</strong> <span style="color: #ff6666;">Location lookup failed</span>
+      `
+    }
     
     // Calculate distance to target location
     const distance = calculateDistance(lat, lon, params.targetLat, params.targetLon)
@@ -599,7 +616,7 @@ let app = {
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const lat = position.coords.latitude
         const lon = position.coords.longitude
         const accuracy = position.coords.accuracy
@@ -613,11 +630,15 @@ let app = {
         this.goToLocation(lat, lon)
         
         // Update coordinate display
-        this.updateCoordinateDisplay(lat, lon)
+        await this.updateCoordinateDisplay(lat, lon)
         
-        // Show success message
-        const region = getRegionName(lat, lon)
-        alert(`Found your location in ${region}!\nCoordinates: ${lat.toFixed(4)}°, ${lon.toFixed(4)}°`)
+        // Show success message with location info
+        try {
+          const region = await getRegionName(lat, lon)
+          alert(`Found your location in ${region}!\nCoordinates: ${lat.toFixed(4)}°, ${lon.toFixed(4)}°`)
+        } catch (error) {
+          alert(`Found your location!\nCoordinates: ${lat.toFixed(4)}°, ${lon.toFixed(4)}°`)
+        }
       },
       (error) => {
         let errorMessage = 'Unable to get your location. '
