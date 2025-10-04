@@ -628,20 +628,10 @@ let app = {
   processAsteroidData(asteroidData) {
     console.log('Processing asteroid data...');
     
-    // First, create a test sphere to make sure we can see things
-    console.log('Creating test sphere at distance 30...');
-    const testSphere = new THREE.Mesh(
-      new THREE.SphereGeometry(3, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xff0000 })
-    );
-    testSphere.position.set(30, 0, 0);
-    this.group.add(testSphere);
-    this.orbitalPaths.push(testSphere);
-    
-    // Much larger scale factor to make orbits very visible
-    const scaleFactor = 0.02; // Much larger scale factor
+    // Much smaller scale factor - the coordinates are in km and are huge!
+    const scaleFactor = 0.0000002; // Very small scale factor for km coordinates
     const earthRadius = 10; // Our Earth radius in Three.js units
-    const minOrbitRadius = earthRadius + 50; // Much larger minimum distance from Earth surface
+    const minOrbitRadius = earthRadius + 5; // Close to Earth surface
     
     // Bright neon color palette for different orbital paths
     const colors = [
@@ -651,7 +641,7 @@ let app = {
     
     let colorIndex = 0;
     let pathCount = 0;
-    const maxPaths = 10; // Show more asteroid orbits
+    const maxPaths = 10; // Show more asteroids now that scaling works
     
     // Process real asteroid data
     console.log(`Starting to process ${Object.keys(asteroidData).length} asteroids...`);
@@ -662,8 +652,8 @@ let app = {
       console.log(`\n--- Processing asteroid ${pathCount + 1}/${maxPaths}: ${asteroidName} ---`);
       console.log(`Raw coordinates length: ${coordinates.length}`);
       
-      // Sample every 5th coordinate for smoother paths
-      const sampledCoords = coordinates.filter((_, index) => index % 5 === 0);
+      // Sample fewer coordinates for debugging the scale
+      const sampledCoords = coordinates.filter((_, index) => index % 20 === 0).slice(0, 10); // Only first 10 sampled points
       console.log(`Sampled coordinates: ${sampledCoords.length} points`);
       
       if (sampledCoords.length < 5) {
@@ -685,6 +675,8 @@ let app = {
         let scaledY = y * scaleFactor;
         let scaledZ = z * scaleFactor;
         
+        console.log(`Raw coords: (${x.toFixed(0)}, ${y.toFixed(0)}, ${z.toFixed(0)}) -> Scaled: (${scaledX.toFixed(2)}, ${scaledY.toFixed(2)}, ${scaledZ.toFixed(2)})`);
+        
         // Calculate distance from origin and ensure minimum distance
         const distance = Math.sqrt(scaledX * scaledX + scaledY * scaledY + scaledZ * scaledZ);
         if (distance < minOrbitRadius) {
@@ -692,6 +684,7 @@ let app = {
           scaledX *= ratio;
           scaledY *= ratio;
           scaledZ *= ratio;
+          console.log(`Adjusted to minimum distance: (${scaledX.toFixed(2)}, ${scaledY.toFixed(2)}, ${scaledZ.toFixed(2)})`);
         }
         
         return new THREE.Vector3(scaledX, scaledY, scaledZ);
@@ -701,25 +694,77 @@ let app = {
       console.log(`Sample points:`, pathPoints.slice(0, 3).map(p => `(${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`));
       console.log(`Distance from origin (first point): ${pathPoints[0].length().toFixed(1)} units`);
       
-      // Create the orbital path geometry
+      // Create truly smooth orbital paths by fitting elliptical curves to the data
+      console.log('Creating smooth elliptical orbital path...');
+      
+      // Analyze the asteroid coordinates to find orbital parameters
+      const centerX = pathPoints.reduce((sum, p) => sum + p.x, 0) / pathPoints.length;
+      const centerY = pathPoints.reduce((sum, p) => sum + p.y, 0) / pathPoints.length;
+      const centerZ = pathPoints.reduce((sum, p) => sum + p.z, 0) / pathPoints.length;
+      const center = new THREE.Vector3(centerX, centerY, centerZ);
+      
+      // Find the average distance to determine orbit size
+      const distances = pathPoints.map(p => p.distanceTo(center));
+      const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+      const maxDistance = Math.max(...distances);
+      const minDistance = Math.min(...distances);
+      
+      // Create a smooth elliptical orbit based on the data
+      const semiMajorAxis = (maxDistance + minDistance) / 2;
+      const semiMinorAxis = semiMajorAxis * 0.8; // Slightly elliptical
+      
+      // Find the orbital plane orientation by analyzing the data spread
+      const firstPoint = pathPoints[0].clone().sub(center).normalize();
+      const midPoint = pathPoints[Math.floor(pathPoints.length / 2)].clone().sub(center).normalize();
+      const normal = firstPoint.clone().cross(midPoint).normalize();
+      const tangent = firstPoint.clone();
+      const bitangent = normal.clone().cross(tangent).normalize();
+      
+      // Generate perfectly smooth elliptical points
+      const numSmoothPoints = 200; // Many points for perfect smoothness
+      const interpolatedPoints = [];
+      
+      for (let i = 0; i < numSmoothPoints; i++) {
+        const angle = (i / numSmoothPoints) * Math.PI * 2;
+        
+        // Create elliptical coordinates
+        const x = Math.cos(angle) * semiMajorAxis;
+        const y = Math.sin(angle) * semiMinorAxis;
+        
+        // Transform to 3D orbital plane
+        const point = center.clone()
+          .add(tangent.clone().multiplyScalar(x))
+          .add(bitangent.clone().multiplyScalar(y))
+          .add(normal.clone().multiplyScalar(Math.sin(angle * 2) * semiMajorAxis * 0.1)); // Small vertical variation
+        
+        interpolatedPoints.push(point);
+      }
+      
+      console.log(`Created ${interpolatedPoints.length} perfectly smooth elliptical orbit points`);
+      
+      // Use the interpolated points for creating the orbital path
+      const finalPathPoints = interpolatedPoints;
+      
+      // Create the orbital path geometry using visible mesh tubes instead of lines
       const pathGeometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
       
-      // Use LineBasicMaterial with maximum visibility settings
-      const pathMaterial = new THREE.LineBasicMaterial({ 
+      console.log(`Creating orbital path with color: 0x${colors[colorIndex % colors.length].toString(16)}`);
+      
+      // Create tube geometry using the perfectly smooth elliptical curve
+      const smoothCurve = new THREE.CatmullRomCurve3(finalPathPoints, true, 'catmullrom', 0);
+      const tubeGeometry = new THREE.TubeGeometry(smoothCurve, 100, 0.5, 16, true); // High resolution
+      const tubeMaterial = new THREE.MeshBasicMaterial({
         color: colors[colorIndex % colors.length],
-        transparent: false,
-        opacity: 1.0,
-        linewidth: 50 // Much thicker lines
+        transparent: true,
+        opacity: 0.7
       });
+      const orbitTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
       
-      console.log(`Creating line with color: 0x${colors[colorIndex % colors.length].toString(16)}`);
-      
-      const orbitLine = new THREE.Line(pathGeometry, pathMaterial);
-      
-      // Create visible spheres at each path point for debugging
-      pathPoints.forEach((point, index) => {
-        if (index % 5 === 0) { // Every 5th point
-          const sphereGeometry = new THREE.SphereGeometry(2, 8, 8);
+      // Create bright spheres at evenly distributed points  
+      const spheres = [];
+      finalPathPoints.forEach((point, index) => {
+        if (index % 25 === 0) { // Evenly spaced markers
+          const sphereGeometry = new THREE.SphereGeometry(0.4, 8, 8);
           const sphereMaterial = new THREE.MeshBasicMaterial({
             color: colors[colorIndex % colors.length],
             transparent: true,
@@ -727,56 +772,34 @@ let app = {
           });
           const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
           sphere.position.copy(point);
-          this.group.add(sphere);
-          this.orbitalPaths.push(sphere);
+          spheres.push(sphere);
         }
       });
       
-      // Create a tube geometry for much better visibility
-      const curve = new THREE.CatmullRomCurve3(pathPoints, true);
-      const tubeGeometry = new THREE.TubeGeometry(curve, pathPoints.length, 1.5, 8, true);
-      const tubeMaterial = new THREE.MeshBasicMaterial({
-        color: colors[colorIndex % colors.length],
-        wireframe: true,
-        transparent: true,
-        opacity: 0.8
-      });
-      const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
-      this.group.add(tube);
-      this.orbitalPaths.push(tube);
-      
-      // Add glow effect by creating a second, thicker line behind
-      const glowMaterial = new THREE.LineBasicMaterial({
-        color: colors[colorIndex % colors.length],
-        transparent: false,
-        opacity: 1.0,
-        linewidth: 100 // Much thicker glow
-      });
-      const glowLine = new THREE.Line(pathGeometry.clone(), glowMaterial);
-      
-      // Add userData to both lines to prevent errors
-      glowLine.userData = {
-        asteroidName: asteroidName + '_glow',
-        isGlow: true
-      };
-      
-      orbitLine.userData = {
+      // Add userData to the tube
+      orbitTube.userData = {
         asteroidName: asteroidName,
-        originalPoints: pathPoints,
+        originalPoints: finalPathPoints, // Use interpolated points
         currentIndex: 0,
-        speed: 0.2 + Math.random() * 0.3 // Random speed for variety
+        speed: 0.2 + Math.random() * 0.3
       };
       
       // Add to scene and array
       console.log(`✓ Successfully added orbital path for ${asteroidName} with ${pathPoints.length} points`);
       console.log(`  Color: 0x${colors[colorIndex % colors.length].toString(16)}`);
-      this.group.add(glowLine); // Add glow effect first (behind)
-      this.group.add(orbitLine);
-      this.orbitalPaths.push(orbitLine);
-      this.orbitalPaths.push(glowLine);
+      console.log(`  Tube radius: 2.0, ${spheres.length} marker spheres`);
       
-      // Create a larger moving asteroid on this orbit
-      this.createOrbitingAsteroid(pathPoints, colors[colorIndex % colors.length], asteroidName);
+      this.group.add(orbitTube);
+      this.orbitalPaths.push(orbitTube);
+      
+      // Add all the spheres
+      spheres.forEach(sphere => {
+        this.group.add(sphere);
+        this.orbitalPaths.push(sphere);
+      });
+      
+      // Create a larger moving asteroid on this orbit using interpolated points
+      this.createOrbitingAsteroid(finalPathPoints, colors[colorIndex % colors.length], asteroidName);
       
       colorIndex++;
       pathCount++;
@@ -917,36 +940,107 @@ let app = {
   },
 
   createOrbitingAsteroid(pathPoints, color, name) {
-    // Create a larger, more visible asteroid that moves along the orbital path
-    const asteroidGeometry = new THREE.IcosahedronGeometry(0.8, 1); // Increased size from 0.4 to 0.8
+    // Create a realistic asteroid
+    const asteroidGeometry = new THREE.IcosahedronGeometry(0.4, 1); // Smaller, more realistic size
+    
+    // Deform the geometry for irregular asteroid shape
+    const positions = asteroidGeometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+      const vertex = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]);
+      const displacement = (Math.random() - 0.5) * 0.1;
+      const normal = vertex.clone().normalize();
+      vertex.add(normal.multiplyScalar(displacement));
+      positions[i] = vertex.x;
+      positions[i + 1] = vertex.y;
+      positions[i + 2] = vertex.z;
+    }
+    asteroidGeometry.attributes.position.needsUpdate = true;
+    asteroidGeometry.computeVertexNormals();
+    
     const asteroidMaterial = new THREE.MeshStandardMaterial({
-      color: color,
-      roughness: 0.3,
-      metalness: 0.7,
-      emissive: color,
-      emissiveIntensity: 0.4 // Increased from 0.2 to 0.4
+      color: this.generateRealisticAsteroidColor(),
+      roughness: 0.9,
+      metalness: 0.1,
+      transparent: false
     });
     
     const orbitingAsteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+    
+    // Create a large glowing sphere around the asteroid for visibility
+    const glowGeometry = new THREE.SphereGeometry(2.0, 16, 16); // Large glow sphere
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide
+    });
+    const glowSphere = new THREE.Mesh(glowGeometry, glowMaterial);
+    
+    // Create an even larger outer glow for extra visibility
+    const outerGlowGeometry = new THREE.SphereGeometry(3.5, 12, 12);
+    const outerGlowMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.DoubleSide
+    });
+    const outerGlowSphere = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
+    
     orbitingAsteroid.userData = {
       pathPoints: pathPoints,
       currentIndex: 0,
-      speed: 0.3 + Math.random() * 0.5,
+      speed: 0.005 + Math.random() * 0.01, // Much much slower movement
       name: name,
       rotationSpeed: {
-        x: (Math.random() - 0.5) * 0.02,
-        y: (Math.random() - 0.5) * 0.02,
-        z: (Math.random() - 0.5) * 0.02
-      }
+        x: (Math.random() - 0.5) * 0.001, // Much slower rotation
+        y: (Math.random() - 0.5) * 0.001,
+        z: (Math.random() - 0.5) * 0.001
+      },
+      glowSphere: glowSphere,
+      outerGlowSphere: outerGlowSphere
     };
     
-    // Set initial position
+    // Set initial positions for all elements
     if (pathPoints.length > 0) {
       orbitingAsteroid.position.copy(pathPoints[0]);
+      glowSphere.position.copy(pathPoints[0]);
+      outerGlowSphere.position.copy(pathPoints[0]);
+      console.log(`Created orbiting asteroid for ${name} at position:`, pathPoints[0]);
     }
     
     this.group.add(orbitingAsteroid);
-    this.orbitalPaths.push(orbitingAsteroid); // Store with paths for updating
+    this.group.add(glowSphere);
+    this.group.add(outerGlowSphere);
+    this.orbitalPaths.push(orbitingAsteroid);
+    this.orbitalPaths.push(glowSphere);
+    this.orbitalPaths.push(outerGlowSphere);
+  },
+
+  generateRealisticAsteroidColor() {
+    // Generate realistic asteroid colors (grays, browns, dark colors)
+    const baseColors = [
+      0x444444, // Dark gray
+      0x666666, // Medium gray  
+      0x553322, // Dark brown
+      0x664433, // Medium brown
+      0x332211, // Very dark brown
+      0x555544, // Grayish brown
+      0x333333, // Very dark gray
+    ];
+    
+    const baseColor = baseColors[Math.floor(Math.random() * baseColors.length)];
+    
+    // Add slight variation
+    const r = ((baseColor >> 16) & 0xff) / 255;
+    const g = ((baseColor >> 8) & 0xff) / 255;
+    const b = (baseColor & 0xff) / 255;
+    
+    const variation = 0.1;
+    const newR = Math.max(0, Math.min(1, r + (Math.random() - 0.5) * variation));
+    const newG = Math.max(0, Math.min(1, g + (Math.random() - 0.5) * variation));
+    const newB = Math.max(0, Math.min(1, b + (Math.random() - 0.5) * variation));
+    
+    return new THREE.Color(newR, newG, newB);
   },
 
   updateOrbitalPaths() {
@@ -981,6 +1075,14 @@ let app = {
           // Check if both points exist before trying to interpolate
           if (currentPoint && nextPoint) {
             pathObject.position.lerpVectors(currentPoint, nextPoint, t);
+            
+            // Also move the glow spheres if they exist
+            if (userData.glowSphere) {
+              userData.glowSphere.position.copy(pathObject.position);
+            }
+            if (userData.outerGlowSphere) {
+              userData.outerGlowSphere.position.copy(pathObject.position);
+            }
           }
           
           // Rotate the asteroid if it has rotation speed
