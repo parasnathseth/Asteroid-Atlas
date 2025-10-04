@@ -324,6 +324,7 @@ let app = {
       'Go to London': () => this.goToLocation(51.5074, -0.1278),
       'Go to Tokyo': () => this.goToLocation(35.6762, 139.6503),
       'Go to Sydney': () => this.goToLocation(-33.8688, 151.2093),
+      'Go to My Location': () => this.goToMyLocation(),
       'Go to Target': () => this.goToLocation(params.targetLat, params.targetLon),
       'Clear Markers': () => this.clearCustomMarkers()
     }
@@ -581,6 +582,98 @@ let app = {
     }
   },
 
+  // Go to user's current location using geolocation
+  goToMyLocation() {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by this browser.')
+      return
+    }
+
+    // Show loading message
+    console.log('Getting your location...')
+    
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 300000 // 5 minutes
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude
+        const lon = position.coords.longitude
+        const accuracy = position.coords.accuracy
+
+        console.log(`Your location: ${lat.toFixed(4)}, ${lon.toFixed(4)} (±${accuracy}m)`)
+        
+        // Add a special marker for user's location
+        this.addUserLocationMarker(lat, lon)
+        
+        // Navigate to user's location
+        this.goToLocation(lat, lon)
+        
+        // Update coordinate display
+        this.updateCoordinateDisplay(lat, lon)
+        
+        // Show success message
+        const region = getRegionName(lat, lon)
+        alert(`Found your location in ${region}!\nCoordinates: ${lat.toFixed(4)}°, ${lon.toFixed(4)}°`)
+      },
+      (error) => {
+        let errorMessage = 'Unable to get your location. '
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Location access denied by user.'
+            break
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information unavailable.'
+            break
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.'
+            break
+          default:
+            errorMessage += 'An unknown error occurred.'
+            break
+        }
+        
+        console.error('Geolocation error:', error)
+        alert(errorMessage)
+      },
+      options
+    )
+  },
+
+  // Add a special marker for user's current location
+  addUserLocationMarker(lat, lon) {
+    // Remove previous user location marker if it exists
+    if (this.userLocationMarker) {
+      this.customMarkers.remove(this.userLocationMarker)
+    }
+    
+    // Create user location marker with distinctive appearance
+    this.userLocationMarker = createLocationMarker(lat, lon, {
+      color: 0xff6600, // Orange color for user location
+      size: 0.25,
+      radius: 10.1
+    })
+    
+    // Add label for user location
+    if (this.userLocationLabel) {
+      this.locationLabels.remove(this.userLocationLabel)
+    }
+    
+    this.userLocationLabel = createLocationLabel('Your Location', lat, lon, {
+      fontSize: 48,
+      fontColor: '#ff6600',
+      backgroundColor: 'rgba(255, 102, 0, 0.8)',
+      radius: 10.6
+    })
+    
+    this.customMarkers.add(this.userLocationMarker)
+    this.locationLabels.add(this.userLocationLabel)
+  },
+
   // @param {number} interval - time elapsed between 2 frames
   // @param {number} elapsed - total time elapsed since app start
   updateScene(interval, elapsed) {
@@ -668,4 +761,8 @@ window.setCoordinates = function(lat, lon) {
   document.getElementById('lat-input').value = lat
   document.getElementById('lon-input').value = lon
   window.appInstance.goToLocation(lat, lon)
+}
+
+window.goToMyCurrentLocation = function() {
+  window.appInstance.goToMyLocation()
 }
