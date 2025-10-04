@@ -1,0 +1,91 @@
+{
+  "title": "Three.js Earth - Globo 3D Interactivo",
+  "loading": {
+    "progress": "Cargando la Tierra..."
+  },
+  "navigation": {
+    "title": "Navegar a Coordenadas",
+    "latitude": "Lat:",
+    "longitude": "Lon:",
+    "latitude_placeholder": "Latitud",
+    "longitude_placeholder": "Longitud",
+    "go_to_location": "Ir a Ubicación",
+    "add_marker": "Añadir Marcador",
+    "my_location": "📍 Mi Ubicación",
+    "quick_locations": "Ubicaciones Rápidas:",
+    "click_instruction": "Haga clic en la Tierra para obtener coordenadas en ese punto"
+  },
+  "locations": {
+    "london": "Londres",
+    "tokyo": "Tokio",
+    "sydney": "Sídney",
+    "new_york": "Nueva York",
+    "paris": "París",
+    "rio_de_janeiro": "Río de Janeiro",
+    "cairo": "El Cairo",
+    "mumbai": "Bombay",
+    "moscow": "Moscú",
+    "cape_town": "Ciudad del Cabo",
+    "beijing": "Pekín",
+    "los_angeles": "Los Ángeles",
+    "dubai": "Dubái",
+    "singapore": "Singapur",
+    "reykjavik": "Reikiavik",
+    "greenwich": "Greenwich (0°,0°)",
+    "null_island": "Isla Null (0°,0°)"
+  },
+  "countries": {
+    "united_states": "Estados Unidos",
+    "united_kingdom": "Reino Unido",
+    "japan": "Japón",
+    "australia": "Australia",
+    "france": "Francia",
+    "brazil": "Brasil",
+    "egypt": "Egipto",
+    "india": "India",
+    "russia": "Rusia",
+    "south_africa": "Sudáfrica",
+    "china": "China",
+    "united_arab_emirates": "Emiratos Árabes Unidos",
+    "singapore": "Singapur",
+    "iceland": "Islandia"
+  },
+  "coordinates": {
+    "format": "{{lat}}°, {{lon}}°",
+    "clicked": "Coordenadas del clic: {{lat}}, {{lon}}",
+    "your_location": "Su ubicación: {{lat}}, {{lon}} (±{{accuracy}}m)",
+    "found_location": "¡Ubicación encontrada!\\nCoordenadas: {{lat}}°, {{lon}}°",
+    "found_location_region": "¡Ubicación encontrada en {{region}}!\\nCoordenadas: {{lat}}°, {{lon}}°",
+    "latitude": "Latitud",
+    "longitude": "Longitud",
+    "region": "Región",
+    "distance_to_target": "Distancia al objetivo",
+    "north": "N",
+    "south": "S",
+    "east": "E",
+    "west": "O"
+  },
+  "measurements": {
+    "kilometers": "km",
+    "meters": "m",
+    "accuracy": "±{{value}}m"
+  },
+  "errors": {
+    "geolocation_not_supported": "La geolocalización no es compatible con este navegador.",
+    "location_permission_denied": "Acceso a la ubicación denegado por el usuario.",
+    "location_unavailable": "La información de ubicación no está disponible.",
+    "location_timeout": "La solicitud de ubicación agotó el tiempo de espera.",
+    "location_unknown": "Ocurrió un error desconocido al obtener la ubicación.",
+    "invalid_coordinates": "Por favor ingrese valores válidos de latitud y longitud",
+    "location_lookup_failed": "Error al buscar ubicación"
+  },
+  "ui": {
+    "language": "Idioma",
+    "select_language": "Seleccionar Idioma"
+  },
+  "info": {
+    "asteroid_info": "Información del Asteroide",
+    "earth_info": "Información de la Tierra",
+    "loading_data": "Cargando datos..."
+  }
+}

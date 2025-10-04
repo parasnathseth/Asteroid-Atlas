@@ -1,0 +1,78 @@
+{
+  "title": "Three.js Earth - Interaktiver 3D-Globus",
+  "loading": {
+    "progress": "Erde wird geladen..."
+  },
+  "navigation": {
+    "title": "Zu Koordinaten navigieren",
+    "latitude": "Lat:",
+    "longitude": "Lon:",
+    "latitude_placeholder": "Breitengrad",
+    "longitude_placeholder": "Längengrad",
+    "go_to_location": "Zu Standort gehen",
+    "add_marker": "Markierung hinzufügen",
+    "my_location": "📍 Mein Standort",
+    "quick_locations": "Schnelle Standorte:",
+    "click_instruction": "Klicken Sie auf die Erde, um Koordinaten an diesem Punkt zu erhalten"
+  },
+  "locations": {
+    "london": "London",
+    "tokyo": "Tokio",
+    "sydney": "Sydney",
+    "new_york": "New York",
+    "paris": "Paris",
+    "rio_de_janeiro": "Rio de Janeiro",
+    "cairo": "Kairo",
+    "mumbai": "Mumbai",
+    "moscow": "Moskau",
+    "cape_town": "Kapstadt",
+    "beijing": "Peking",
+    "los_angeles": "Los Angeles",
+    "dubai": "Dubai",
+    "singapore": "Singapur",
+    "reykjavik": "Reykjavik",
+    "greenwich": "Greenwich (0°,0°)",
+    "null_island": "Null-Insel (0°,0°)"
+  },
+  "countries": {
+    "united_states": "Vereinigte Staaten",
+    "united_kingdom": "Vereinigtes Königreich",
+    "japan": "Japan",
+    "australia": "Australien",
+    "france": "Frankreich",
+    "brazil": "Brasilien",
+    "egypt": "Ägypten",
+    "india": "Indien",
+    "russia": "Russland",
+    "south_africa": "Südafrika",
+    "china": "China",
+    "united_arab_emirates": "Vereinigte Arabische Emirate",
+    "singapore": "Singapur",
+    "iceland": "Island"
+  },
+  "coordinates": {
+    "format": "{{lat}}°, {{lon}}°",
+    "clicked": "Geklickte Koordinaten: {{lat}}, {{lon}}",
+    "your_location": "Ihr Standort: {{lat}}, {{lon}} (±{{accuracy}}m)",
+    "found_location": "Standort gefunden!\\nKoordinaten: {{lat}}°, {{lon}}°",
+    "found_location_region": "Standort in {{region}} gefunden!\\nKoordinaten: {{lat}}°, {{lon}}°"
+  },
+  "errors": {
+    "geolocation_not_supported": "Geolokalisierung wird von diesem Browser nicht unterstützt.",
+    "location_permission_denied": "Standortzugriff vom Benutzer verweigert.",
+    "location_unavailable": "Standortinformationen sind nicht verfügbar.",
+    "location_timeout": "Standortanfrage ist abgelaufen.",
+    "location_unknown": "Ein unbekannter Fehler ist beim Abrufen des Standorts aufgetreten.",
+    "invalid_coordinates": "Bitte geben Sie gültige Breiten- und Längengradwerte ein",
+    "location_lookup_failed": "Standortsuche fehlgeschlagen"
+  },
+  "ui": {
+    "language": "Sprache",
+    "select_language": "Sprache auswählen"
+  },
+  "info": {
+    "asteroid_info": "Asteroidinformationen",
+    "earth_info": "Erdinformationen",
+    "loading_data": "Daten werden geladen..."
+  }
+}

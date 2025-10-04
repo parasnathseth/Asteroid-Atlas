@@ -1,0 +1,91 @@
+{
+  "title": "Three.js Earth - Interactive 3D Globe",
+  "loading": {
+    "progress": "Loading Earth..."
+  },
+  "navigation": {
+    "title": "Navigate to Coordinates",
+    "latitude": "Lat:",
+    "longitude": "Lon:",
+    "latitude_placeholder": "Latitude",
+    "longitude_placeholder": "Longitude",
+    "go_to_location": "Go to Location",
+    "add_marker": "Add Marker",
+    "my_location": "📍 My Location",
+    "quick_locations": "Quick Locations:",
+    "click_instruction": "Click on Earth to get coordinates at that point"
+  },
+  "locations": {
+    "london": "London",
+    "tokyo": "Tokyo",
+    "sydney": "Sydney",
+    "new_york": "New York",
+    "paris": "Paris",
+    "rio_de_janeiro": "Rio de Janeiro",
+    "cairo": "Cairo",
+    "mumbai": "Mumbai",
+    "moscow": "Moscow",
+    "cape_town": "Cape Town",
+    "beijing": "Beijing",
+    "los_angeles": "Los Angeles",
+    "dubai": "Dubai",
+    "singapore": "Singapore",
+    "reykjavik": "Reykjavik",
+    "greenwich": "Greenwich (0°,0°)",
+    "null_island": "Null Island (0°,0°)"
+  },
+  "countries": {
+    "united_states": "United States",
+    "united_kingdom": "United Kingdom",
+    "japan": "Japan",
+    "australia": "Australia",
+    "france": "France",
+    "brazil": "Brazil",
+    "egypt": "Egypt",
+    "india": "India",
+    "russia": "Russia",
+    "south_africa": "South Africa",
+    "china": "China",
+    "united_arab_emirates": "United Arab Emirates",
+    "singapore": "Singapore",
+    "iceland": "Iceland"
+  },
+  "coordinates": {
+    "format": "{{lat}}°, {{lon}}°",
+    "clicked": "Clicked coordinates: {{lat}}, {{lon}}",
+    "your_location": "Your location: {{lat}}, {{lon}} (±{{accuracy}}m)",
+    "found_location": "Found your location!\\nCoordinates: {{lat}}°, {{lon}}°",
+    "found_location_region": "Found your location in {{region}}!\\nCoordinates: {{lat}}°, {{lon}}°",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "region": "Region",
+    "distance_to_target": "Distance to target",
+    "north": "N",
+    "south": "S",
+    "east": "E",
+    "west": "W"
+  },
+  "measurements": {
+    "kilometers": "km",
+    "meters": "m",
+    "accuracy": "±{{value}}m"
+  },
+  "errors": {
+    "geolocation_not_supported": "Geolocation is not supported by this browser.",
+    "location_permission_denied": "Location access denied by user.",
+    "location_unavailable": "Location information is unavailable.",
+    "location_timeout": "Location request timed out.",
+    "location_unknown": "An unknown error occurred while retrieving location.",
+    "invalid_coordinates": "Please enter valid latitude and longitude values",
+    "location_lookup_failed": "Location lookup failed"
+  },
+  "ui": {
+    "language": "Language",
+    "select_language": "Select Language"
+  },
+  "info": {
+    "asteroid_info": "Asteroid Information",
+    "earth_info": "Earth Information",
+    "loading_data": "Loading data..."
+  }
+}
