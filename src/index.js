@@ -371,7 +371,7 @@ let app = {
       'Go to New York': () => this.goToLocation(40.7128, -74.0060),
       'Go to London': () => this.goToLocation(51.5074, -0.1278),
       'Go to Tokyo': () => this.goToLocation(35.6762, 139.6503),
-      'Go to Sydney': () => this.goToLocation(-33.8688, 151.2093),
+      'Go to Washington': () => this.goToLocation(38.9072, -77.0369),
       'Go to My Location': () => this.goToMyLocation(),
       'Go to Target': () => this.goToLocation(params.targetLat, params.targetLon),
       'Clear Markers': () => this.clearCustomMarkers()
@@ -844,6 +844,28 @@ let app = {
     `
   },
 
+  // Update control panel coordinates when clicking on Earth
+  updateControlPanelCoordinates(lat, lon) {
+    const latInput = document.getElementById('target-lat');
+    const lonInput = document.getElementById('target-lon');
+    
+    if (latInput && lonInput) {
+      latInput.value = lat.toFixed(4);
+      lonInput.value = lon.toFixed(4);
+      
+      // Add a brief visual feedback
+      latInput.style.backgroundColor = '#0066cc';
+      lonInput.style.backgroundColor = '#0066cc';
+      
+      setTimeout(() => {
+        latInput.style.backgroundColor = '#333';
+        lonInput.style.backgroundColor = '#333';
+      }, 500);
+      
+      console.log(`Control panel updated: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+    }
+  },
+
   // Add temporary marker at clicked location
   addTemporaryMarker(lat, lon) {
     // Remove previous temporary marker
@@ -1156,6 +1178,9 @@ let app = {
         // Update coordinate display
         this.updateCoordinateDisplay(coords.lat, coords.lon, intersectionPoint)
         
+        // Update control panel coordinates
+        this.updateControlPanelCoordinates(coords.lat, coords.lon)
+        
         // Add a temporary marker at clicked location
         this.addTemporaryMarker(coords.lat, coords.lon)
       } else {
@@ -1411,6 +1436,38 @@ let app = {
     geometry.computeVertexNormals() // Recalculate normals after deformation
   },
 
+  // Launch asteroid to specific coordinates with custom parameters
+  launchAsteroidToCoordinates(lat, lon, diameter, speed, density, angle) {
+    // Convert lat/lon to world position on Earth surface
+    const worldPosition = latLonToVector3(lat, lon, 10.02); // Slightly above Earth surface
+    
+    // Convert world coordinates to local coordinates relative to the group
+    const localPosition = this.group.worldToLocal(worldPosition.clone());
+    
+    // Temporarily store current params
+    const originalSize = params.asteroidSize;
+    const originalSpeed = params.asteroidSpeed;
+    
+    // Add custom parameters to params object
+    params.asteroidSize = diameter;
+    params.asteroidSpeed = speed / 1000; // Convert m/s to km/s for consistency
+    params.customDensity = density;
+    params.customAngle = angle;
+    params.usingCustomParams = true;
+    
+    // Use the existing asteroid launch system
+    this.launchAsteroid(localPosition);
+    
+    // Restore original params
+    params.asteroidSize = originalSize;
+    params.asteroidSpeed = originalSpeed;
+    delete params.customDensity;
+    delete params.customAngle;
+    delete params.usingCustomParams;
+    
+    console.log(`Asteroid launched to ${lat.toFixed(4)}, ${lon.toFixed(4)} with ${diameter}m diameter at ${speed}m/s`);
+  },
+
   createImpactCrater(impactPosition, realSizeMeters, speed = params.asteroidSpeed) {
     // Calculate impact zones using the imported physics model
     this.calculateAndVisualizeImpactZones(impactPosition, realSizeMeters, speed * 1000); // Convert km/s to m/s
@@ -1421,13 +1478,13 @@ let app = {
 
 
   calculateAndVisualizeImpactZones(impactPosition, asteroidDiameter_m, speed_ms) {
-    // Use realistic material densities and impact angles
+    // Use custom parameters if they were set, otherwise use defaults
     const impactParams = {
       L0_m: asteroidDiameter_m,
-      rho_i: 3100,      // kg/m³ (typical stony asteroid density)
+      rho_i: params.usingCustomParams ? params.customDensity : 3100,      // kg/m³ (custom or typical stony asteroid density)
       rho_t: 2500,      // kg/m³ (typical sedimentary rock density)
       v_ms: speed_ms,
-      gamma_deg: 45,    // 45° impact angle
+      gamma_deg: params.usingCustomParams ? params.customAngle : 45,    // Custom or 45° impact angle
       luminousEfficiency: 1e-3  // typical luminous efficiency
     };
 
@@ -1435,6 +1492,12 @@ let app = {
     const zones = ImpactZones.computeAll(impactParams);
     
     console.log('Impact zones calculated:', zones);
+    if (params.usingCustomParams) {
+      console.log('Using custom parameters:', { 
+        density: params.customDensity, 
+        angle: params.customAngle 
+      });
+    }
     
     // Convert world coordinates to lat/lon for zone calculation
     const impactCoords = vector3ToLatLon(impactPosition);
