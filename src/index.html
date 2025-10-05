@@ -162,11 +162,7 @@
     <div id="language-selector-container">
       <label for="language-selector" data-i18n="ui.language" style="color: white; font-size: 12px; margin-right: 5px;">Language:</label>
       <select id="language-selector" onchange="changeLanguage(this.value)">
-        <option value="en">English</option>
-        <option value="es">Español</option>
-        <option value="fr">Français</option>
-        <option value="de">Deutsch</option>
-        <option value="zh">中文</option>
+        <!-- Options will be populated dynamically -->
       </select>
     </div>
     
@@ -195,32 +191,44 @@
       </div>
     </div>
     
-    <script src="./i18n.js" type="module"></script>
+    <script src="./dynamic-i18n.js" type="module"></script>
     <script src="./index.js" type="module"></script>
     <script>
       // Global function to change language
       async function changeLanguage(language) {
         await window.i18n.changeLanguage(language);
+        updateQuickLocationButtons();
       }
       
       // Initialize i18n when page loads
       document.addEventListener('DOMContentLoaded', async () => {
         await window.i18n.init();
-        
-        // Listen for language changes to update dynamic content
-        window.addEventListener('languageChanged', (event) => {
-          // Update quick location button text
-          updateQuickLocationButtons();
-        });
+        updateLanguageOptions();
       });
       
+      // Update language selector with all available languages
+      function updateLanguageOptions() {
+        const selector = document.getElementById('language-selector');
+        const languages = window.i18n.getAvailableLanguages();
+        
+        selector.innerHTML = '';
+        languages.forEach(lang => {
+          const option = document.createElement('option');
+          option.value = lang.code;
+          option.textContent = `${lang.nativeName} (${lang.name})`;
+          selector.appendChild(option);
+        });
+        
+        selector.value = window.i18n.currentLanguage;
+      }
+      
       // Update quick location button text based on current language
-      function updateQuickLocationButtons() {
+      async function updateQuickLocationButtons() {
         const buttons = document.querySelectorAll('#coordinate-input button[onclick*="setCoordinates"]');
         if (buttons.length >= 3) {
-          buttons[0].textContent = window.i18n.translateLocation('London');
-          buttons[1].textContent = window.i18n.translateLocation('Tokyo');  
-          buttons[2].textContent = window.i18n.translateLocation('Sydney');
+          buttons[0].textContent = await window.i18n.translateLocation('London');
+          buttons[1].textContent = await window.i18n.translateLocation('Tokyo');  
+          buttons[2].textContent = await window.i18n.translateLocation('Sydney');
         }
       }
     </script>

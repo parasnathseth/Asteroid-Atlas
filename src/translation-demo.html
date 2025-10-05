@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Translation System Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .demo-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .translation-test {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .controls {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #007cba;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        select {
+            padding: 5px;
+            margin: 5px;
+        }
+        .cache-info {
+            background: #e8f4f8;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #d32f2f;
+        }
+        .success {
+            color: #388e3c;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dynamic Translation System Demo</h1>
+    
+    <div class="controls">
+        <h3>Controls</h3>
+        <label for="language-select">Select Language:</label>
+        <select id="language-select" onchange="changeLanguage(this.value)">
+            <!-- Will be populated dynamically -->
+        </select>
+        
+        <button onclick="clearCache()">Clear Cache</button>
+        <button onclick="showCacheInfo()">Show Cache</button>
+        <button onclick="testTranslation()">Test Translation</button>
+    </div>
+
+    <div class="demo-section">
+        <h3>Static Translation Examples (Using data-i18n)</h3>
+        <p data-i18n="loading.title">Loading Asteroid Atlas...</p>
+        <p data-i18n="navigation.latitude">Latitude</p>
+        <p data-i18n="navigation.longitude">Longitude</p>
+        <p data-i18n="ui.language">Language</p>
+    </div>
+
+    <div class="demo-section">
+        <h3>Dynamic Translation Examples</h3>
+        <div class="translation-test">
+            <input type="text" id="text-input" placeholder="Enter text to translate" value="Hello World">
+            <button onclick="translateCustomText()">Translate</button>
+            <span id="translation-result"></span>
+        </div>
+        
+        <div class="translation-test">
+            <span>Location Translation:</span>
+            <button onclick="translateLocation('New York')">New York</button>
+            <button onclick="translateLocation('Paris')">Paris</button>
+            <button onclick="translateLocation('Tokyo')">Tokyo</button>
+            <span id="location-result"></span>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h3>API Status</h3>
+        <div id="api-status">Testing translation APIs...</div>
+    </div>
+
+    <div class="demo-section">
+        <h3>Cache Information</h3>
+        <div id="cache-info" class="cache-info">Cache not loaded</div>
+    </div>
+
+    <script type="module">
+        import dynamicI18n from './dynamic-i18n.js';
+
+        // Make i18n available globally for demo
+        window.i18n = dynamicI18n;
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initDemo();
+        });
+
+        async function initDemo() {
+            try {
+                await dynamicI18n.init();
+                populateLanguageSelector();
+                await testAPIs();
+                updateCacheInfo();
+                console.log('Demo initialized successfully');
+            } catch (error) {
+                console.error('Demo initialization failed:', error);
+                document.getElementById('api-status').innerHTML = `<span class="error">Initialization failed: ${error.message}</span>`;
+            }
+        }
+
+        function populateLanguageSelector() {
+            const selector = document.getElementById('language-select');
+            const languages = dynamicI18n.getAvailableLanguages();
+            
+            selector.innerHTML = '';
+            languages.forEach(lang => {
+                const option = document.createElement('option');
+                option.value = lang.code;
+                option.textContent = `${lang.nativeName} (${lang.name})`;
+                selector.appendChild(option);
+            });
+            
+            selector.value = dynamicI18n.currentLanguage;
+        }
+
+        async function testAPIs() {
+            const statusDiv = document.getElementById('api-status');
+            statusDiv.innerHTML = '<span class="loading">Testing translation APIs...</span>';
+            
+            try {
+                // Test with a simple word
+                const testText = 'Hello';
+                const translation = await dynamicI18n.translateText(testText, 'es');
+                
+                if (translation && translation !== testText) {
+                    statusDiv.innerHTML = `<span class="success">✓ Translation APIs working. Test: "${testText}" → "${translation}"</span>`;
+                } else {
+                    statusDiv.innerHTML = '<span class="error">⚠ Translation APIs not responding or returning unchanged text</span>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">✗ Translation API test failed: ${error.message}</span>`;
+            }
+        }
+
+        // Global functions for demo buttons
+        window.changeLanguage = async function(language) {
+            try {
+                await dynamicI18n.changeLanguage(language);
+                updateCacheInfo();
+                console.log(`Language changed to: ${language}`);
+            } catch (error) {
+                console.error('Language change failed:', error);
+            }
+        };
+
+        window.clearCache = function() {
+            dynamicI18n.clearCache();
+            updateCacheInfo();
+            console.log('Translation cache cleared');
+        };
+
+        window.showCacheInfo = function() {
+            updateCacheInfo();
+        };
+
+        window.testTranslation = async function() {
+            const testTexts = ['Good morning', 'Thank you', 'Welcome'];
+            const resultDiv = document.getElementById('translation-result');
+            
+            resultDiv.innerHTML = '<span class="loading">Testing translations...</span>';
+            
+            try {
+                const results = [];
+                for (const text of testTexts) {
+                    const translation = await dynamicI18n.translateText(text, dynamicI18n.currentLanguage);
+                    results.push(`"${text}" → "${translation || 'No translation'}"`);
+                }
+                resultDiv.innerHTML = results.join('<br>');
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Test failed: ${error.message}</span>`;
+            }
+        };
+
+        window.translateCustomText = async function() {
+            const input = document.getElementById('text-input');
+            const resultDiv = document.getElementById('translation-result');
+            
+            if (!input.value.trim()) return;
+            
+            resultDiv.innerHTML = '<span class="loading">Translating...</span>';
+            
+            try {
+                const translation = await dynamicI18n.translateText(input.value, dynamicI18n.currentLanguage);
+                resultDiv.innerHTML = `"${input.value}" → "${translation || 'No translation available'}"`;
+                updateCacheInfo();
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Translation failed: ${error.message}</span>`;
+            }
+        };
+
+        window.translateLocation = async function(locationName) {
+            const resultDiv = document.getElementById('location-result');
+            
+            resultDiv.innerHTML = '<span class="loading">Translating location...</span>';
+            
+            try {
+                const translation = await dynamicI18n.translateLocation(locationName);
+                resultDiv.innerHTML = `"${locationName}" → "${translation}"`;
+                updateCacheInfo();
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Location translation failed: ${error.message}</span>`;
+            }
+        };
+
+        function updateCacheInfo() {
+            const cacheDiv = document.getElementById('cache-info');
+            const cache = dynamicI18n.exportCache();
+            const cacheSize = Object.keys(cache).length;
+            
+            if (cacheSize === 0) {
+                cacheDiv.innerHTML = 'Cache is empty';
+            } else {
+                cacheDiv.innerHTML = `Cache contains ${cacheSize} translations:<br><br>`;
+                
+                // Show first 5 entries as examples
+                const entries = Object.entries(cache).slice(0, 5);
+                entries.forEach(([key, value]) => {
+                    cacheDiv.innerHTML += `${key}: "${value}"<br>`;
+                });
+                
+                if (cacheSize > 5) {
+                    cacheDiv.innerHTML += `... and ${cacheSize - 5} more entries`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
