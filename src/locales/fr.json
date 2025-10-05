@@ -1,0 +1,99 @@
+{
+  "title": "Three.js Earth - Globe 3D Interactif",
+  "loading": {
+    "progress": "Chargement de la Terre..."
+  },
+  "navigation": {
+    "title": "Naviguer vers les Coordonnées",
+    "latitude": "Lat:",
+    "longitude": "Lon:",
+    "latitude_placeholder": "Latitude",
+    "longitude_placeholder": "Longitude",
+    "go_to_location": "Aller à l'Emplacement",
+    "add_marker": "Ajouter un Marqueur",
+    "my_location": "📍 Ma Position",
+    "quick_locations": "Emplacements Rapides:",
+    "click_instruction": "Cliquez sur la Terre pour obtenir les coordonnées à ce point"
+  },
+  "locations": {
+    "london": "Londres",
+    "tokyo": "Tokyo",
+    "sydney": "Sydney",
+    "new_york": "New York",
+    "paris": "Paris",
+    "rio_de_janeiro": "Rio de Janeiro",
+    "cairo": "Le Caire",
+    "mumbai": "Mumbai",
+    "moscow": "Moscou",
+    "cape_town": "Le Cap",
+    "beijing": "Pékin",
+    "los_angeles": "Los Angeles",
+    "dubai": "Dubaï",
+    "singapore": "Singapour",
+    "reykjavik": "Reykjavik",
+    "greenwich": "Greenwich (0°,0°)",
+    "null_island": "Île Null (0°,0°)"
+  },
+  "countries": {
+    "united_states": "États-Unis",
+    "united_kingdom": "Royaume-Uni",
+    "japan": "Japon",
+    "australia": "Australie",
+    "france": "France",
+    "brazil": "Brésil",
+    "egypt": "Égypte",
+    "india": "Inde",
+    "russia": "Russie",
+    "south_africa": "Afrique du Sud",
+    "china": "Chine",
+    "united_arab_emirates": "Émirats Arabes Unis",
+    "singapore": "Singapour",
+    "iceland": "Islande"
+  },
+  "coordinates": {
+    "format": "{{lat}}°, {{lon}}°",
+    "clicked": "Coordonnées cliquées: {{lat}}, {{lon}}",
+    "your_location": "Votre position: {{lat}}, {{lon}} (±{{accuracy}}m)",
+    "found_location": "Position trouvée!\\nCoordonnées: {{lat}}°, {{lon}}°",
+    "found_location_region": "Position trouvée dans {{region}}!\\nCoordonnées: {{lat}}°, {{lon}}°",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "region": "Région",
+    "distance_to_target": "Distance à la cible",
+    "north": "N",
+    "south": "S",
+    "east": "E",
+    "west": "O"
+  },
+  "measurements": {
+    "kilometers": "km",
+    "meters": "m",
+    "accuracy": "±{{value}}m"
+  },
+  "errors": {
+    "geolocation_not_supported": "La géolocalisation n'est pas supportée par ce navigateur.",
+    "location_permission_denied": "Accès à la localisation refusé par l'utilisateur.",
+    "location_unavailable": "Les informations de localisation ne sont pas disponibles.",
+    "location_timeout": "La demande de localisation a expiré.",
+    "location_unknown": "Une erreur inconnue s'est produite lors de la récupération de la localisation.",
+    "invalid_coordinates": "Veuillez entrer des valeurs valides de latitude et longitude",
+    "location_lookup_failed": "Échec de la recherche de localisation"
+  },
+  "ui": {
+    "language": "Langue",
+    "select_language": "Sélectionner la Langue",
+    "impact_zones": "Zones d'Impact",
+    "impact_energy": "Énergie d'Impact",
+    "crater_zone": "Cratère (100% destruction)",
+    "fireball_zone": "Boule de Feu (50% mortalité)",
+    "overpressure_zone": "Onde de Choc (0.5 kPa / 0.07 psi)",
+    "wind_zone": "Rafale de Vent (10 m/s / 22 mph)",
+    "seismic_zone": "Sismique (Meff 7.0)",
+    "impact_location": "Lieu d'Impact"
+  },
+  "info": {
+    "asteroid_info": "Informations sur l'Astéroïde",
+    "earth_info": "Informations sur la Terre",
+    "loading_data": "Chargement des données..."
+  }
+}
