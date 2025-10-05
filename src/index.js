@@ -381,7 +381,7 @@ let app = {
       coordFolder.add(locationActions, actionName)
     })
     
-    coordFolder.open()
+    coordFolder.close()
     // Add asteroid impact controls
     const asteroidFolder = gui.addFolder('Asteroid Impact')
     asteroidFolder.add(params, 'asteroidSize', 1, 5000).name('Size (meters)')
@@ -403,7 +403,7 @@ let app = {
     // Store reference for updates
     this.selectedAsteroidInfo = selectedAsteroidInfo
     
-    asteroidFolder.open()
+    asteroidFolder.close()
     
     // Add orbital paths controls
     const orbitalFolder = gui.addFolder('Orbital Paths')
@@ -412,7 +412,17 @@ let app = {
         pathObject.visible = value;
       });
     })
-    orbitalFolder.open()
+    
+    orbitalFolder.close()
+    
+    // Position dat.GUI to avoid overlap with other UI elements
+    gui.domElement.style.position = 'absolute'
+    gui.domElement.style.top = '10px'
+    gui.domElement.style.right = '480px' // Position it to the left of impact zones window
+    gui.domElement.style.zIndex = '999' // Lower z-index than other UI elements
+    
+    // Close the entire GUI panel by default
+    gui.close()
 
     // Stats - show fps
     this.stats1 = new Stats()
@@ -1294,18 +1304,48 @@ let app = {
       // Convert km to meters and clamp to valid range
       const sizeInMeters = Math.min(Math.max(properties.size_km * 1000, 1), 5000)
       params.asteroidSize = sizeInMeters
+      
+      // Update control panel diameter input (asteroid-diameter expects meters)
+      const diameterInput = document.getElementById('asteroid-diameter')
+      if (diameterInput) {
+        diameterInput.value = sizeInMeters
+      }
     }
     
     if (typeof properties.speed_km_s === 'number') {
-      // Clamp speed to valid range
+      // Clamp speed to valid range (dat.GUI expects km/s)
       const speedInKmPerS = Math.min(Math.max(properties.speed_km_s, 1), 100)
       params.asteroidSpeed = speedInKmPerS
+      
+      // Update control panel speed input (asteroid-speed expects m/s)
+      const speedInput = document.getElementById('asteroid-speed')
+      if (speedInput) {
+        const speedInMPerS = speedInKmPerS * 1000 // Convert km/s to m/s
+        speedInput.value = speedInMPerS
+      }
     }
     
     // Update the GUI display to reflect the new values
     if (window.gui) {
       window.gui.updateDisplay()
     }
+    
+    // Trigger change events for control panel inputs to ensure proper synchronization
+    const diameterInput = document.getElementById('asteroid-diameter')
+    const speedInput = document.getElementById('asteroid-speed')
+    if (diameterInput) {
+      diameterInput.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    if (speedInput) {
+      speedInput.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+
+    console.log(`✅ Updated UI parameters for asteroid: ${name}`, {
+      diameter_m: diameterInput ? diameterInput.value : 'N/A',
+      speed_ms: speedInput ? speedInput.value : 'N/A',
+      datGUI_size: params.asteroidSize,
+      datGUI_speed: params.asteroidSpeed
+    })
 
     console.log(`Selected asteroid: ${name}`, {
       size: this.selectedAsteroidInfo.size,
