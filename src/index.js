@@ -23,6 +23,8 @@ import {
 import { createDebugCoordinateGrid, testCoordinateMapping } from "./debug-coordinates"
 // Internationalization
 import i18n from "./i18n.js"
+// Impact zones calculation
+import ImpactZones from "./impactZones.js"
 import Albedo from "./assets/Albedo.jpg"
 import Bump from "./assets/Bump.jpg"
 import Clouds from "./assets/Clouds.png"
@@ -377,7 +379,7 @@ let app = {
     coordFolder.open()
     // Add asteroid impact controls
     const asteroidFolder = gui.addFolder('Asteroid Impact')
-    asteroidFolder.add(params, 'asteroidSize', 1, 1500).name('Size (meters)')
+    asteroidFolder.add(params, 'asteroidSize', 1, 5000).name('Size (meters)')
     asteroidFolder.add(params, 'asteroidSpeed', 1, 100).name('Speed (km/s)')
     asteroidFolder.open()
     
@@ -1117,9 +1119,9 @@ let app = {
     });
     const asteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
 
-    // Calculate impact duration based on speed (faster = shorter flight time)
+    // Calculate impact duration based on speed (slower flight time for better visibility)
     const baseDistance = 25; // units
-    const flightTime = Math.max(100, Math.min(2000, 2000 / speedInKmPerSec)); // 100ms to 2000ms
+    const flightTime = Math.max(2000, Math.min(5000, 5000 / speedInKmPerSec)); // 2s to 5s flight time
 
     // Calculate straight perpendicular approach
     const surfaceNormal = targetPosition.clone().normalize();
@@ -1132,16 +1134,16 @@ let app = {
       Math.random() * Math.PI
     );
 
-    // Store animation properties
+    // Store animation properties with slower rotation
     asteroid.userData = {
       startPosition: startPosition.clone(),
       targetPosition: targetPosition.clone(),
       startTime: Date.now(),
       duration: flightTime,
       rotationSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.4,
-        (Math.random() - 0.5) * 0.4,
-        (Math.random() - 0.5) * 0.4
+        (Math.random() - 0.5) * 0.2, // Slower rotation
+        (Math.random() - 0.5) * 0.2,
+        (Math.random() - 0.5) * 0.2
       ),
       // Pass size for impact scaling
       realSizeMeters: sizeInMeters
@@ -1202,6 +1204,601 @@ let app = {
     geometry.computeVertexNormals() // Recalculate normals after deformation
   },
 
+  createImpactCrater(impactPosition, realSizeMeters, speed = params.asteroidSpeed) {
+    // Calculate impact zones using the imported physics model
+    this.calculateAndVisualizeImpactZones(impactPosition, realSizeMeters, speed * 1000); // Convert km/s to m/s
+    
+    // Create impact flash effect
+    this.createImpactFlash(impactPosition, realSizeMeters, speed);
+  },
+
+
+  calculateAndVisualizeImpactZones(impactPosition, asteroidDiameter_m, speed_ms) {
+    // Use realistic material densities and impact angles
+    const impactParams = {
+      L0_m: asteroidDiameter_m,
+      rho_i: 3100,      // kg/m³ (typical stony asteroid density)
+      rho_t: 2500,      // kg/m³ (typical sedimentary rock density)
+      v_ms: speed_ms,
+      gamma_deg: 45,    // 45° impact angle
+      luminousEfficiency: 1e-3  // typical luminous efficiency
+    };
+
+    // Calculate impact zones using Rumpf (2016) physics model
+    const zones = ImpactZones.computeAll(impactParams);
+    
+    console.log('Impact zones calculated:', zones);
+    
+    // Convert world coordinates to lat/lon for zone calculation
+    const impactCoords = vector3ToLatLon(impactPosition);
+    const impactLat = impactCoords.lat;
+    const impactLon = impactCoords.lon;
+    
+    // Create visual zones on Earth surface
+    this.createImpactZoneVisualization(impactLat, impactLon, zones);
+  },
+
+  createImpactZoneVisualization(centerLat, centerLon, zones) {
+    // Zone configurations with colors and transparency
+    const zoneConfigs = [
+      {
+        name: 'crater',
+        radius_m: zones.crater.D_final_m / 2,
+        color: 0x8B0000,  // Dark red - 100% mortality
+        opacity: 0.8,
+        label: 'Crater (100% mortality)'
+      },
+      {
+        name: 'fireball',
+        radius_m: zones.fireball50_m,
+        color: 0xFF4500,  // Orange-red - thermal radiation
+        opacity: 0.6,
+        label: 'Fireball (50% mortality)'
+      },
+      {
+        name: 'overpressure', 
+        radius_m: zones.overpressure50_m,
+        color: 0xFF1493,  // Deep pink - blast overpressure
+        opacity: 0.5,
+        label: 'Overpressure (50% mortality)'
+      },
+      {
+        name: 'wind',
+        radius_m: zones.wind50_m,
+        color: 0x9370DB,  // Medium purple - wind blast
+        opacity: 0.4,
+        label: 'Wind Blast (50% mortality)'
+      },
+      {
+        name: 'seismic',
+        radius_m: zones.seismic50_m,
+        color: 0x32CD32,  // Lime green - seismic/earthquake
+        opacity: 0.3,
+        label: 'Seismic (50% mortality)'
+      }
+    ];
+
+    // Sort zones by radius (largest first) so they render properly
+    zoneConfigs.sort((a, b) => (b.radius_m || 0) - (a.radius_m || 0));
+
+    // Create each zone as a circle on Earth's surface
+    zoneConfigs.forEach(config => {
+      if (config.radius_m && !isNaN(config.radius_m) && config.radius_m > 0) {
+        this.createImpactZoneCircle(centerLat, centerLon, config);
+      }
+    });
+
+    // Add legend/info display for this impact
+    this.addImpactZoneInfo(centerLat, centerLon, zones);
+  },
+
+  createImpactZoneCircle(centerLat, centerLon, config) {
+    const radius_m = config.radius_m;
+    const earthRadius_m = 6371000; // Earth radius in meters
+    
+    // Convert radius to angular distance (radians)
+    const angularRadius = radius_m / earthRadius_m;
+    
+    // Create circle geometry points around the impact center
+    const segments = 64;
+    const points = [];
+    
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      
+      // Calculate point on circle using spherical trigonometry
+      const deltaLat = angularRadius * Math.cos(angle);
+      const deltaLon = angularRadius * Math.sin(angle) / Math.cos(centerLat * Math.PI / 180);
+      
+      const lat = centerLat + (deltaLat * 180 / Math.PI);
+      const lon = centerLon + (deltaLon * 180 / Math.PI);
+      
+      // Convert to 3D position slightly above Earth surface
+      const position = latLonToVector3(lat, lon, 10.02 + config.opacity * 0.1);
+      points.push(position);
+    }
+    
+    // Create the zone circle geometry
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color: config.color,
+      transparent: true,
+      opacity: config.opacity,
+      linewidth: 3
+    });
+    
+    const circle = new THREE.Line(geometry, material);
+    circle.userData = {
+      type: 'impactZone',
+      zoneName: config.name,
+      label: config.label,
+      radius_m: radius_m
+    };
+    
+    // Add to scene
+    this.group.add(circle);
+    
+    // Also create a filled zone for better visibility
+    if (config.name === 'crater' || config.name === 'fireball') {
+      this.createFilledZone(points, config);
+    }
+  },
+
+  createFilledZone(points, config) {
+    // Create a filled circular area for high-mortality zones
+    const shape = new THREE.Shape();
+    
+    if (points.length > 0) {
+      // Project points to local 2D coordinate system for shape creation
+      const center = points[0].clone();
+      shape.moveTo(0, 0);
+      
+      for (let i = 1; i < points.length; i++) {
+        const localPoint = points[i].clone().sub(center);
+        shape.lineTo(localPoint.x, localPoint.y);
+      }
+      shape.closePath();
+      
+      const geometry = new THREE.ShapeGeometry(shape);
+      const material = new THREE.MeshBasicMaterial({
+        color: config.color,
+        transparent: true,
+        opacity: config.opacity * 0.3,
+        side: THREE.DoubleSide
+      });
+      
+      const filledZone = new THREE.Mesh(geometry, material);
+      filledZone.position.copy(center);
+      filledZone.lookAt(new THREE.Vector3(0, 0, 0)); // Face toward Earth center
+      
+      filledZone.userData = {
+        type: 'impactZoneFill',
+        zoneName: config.name + '_fill'
+      };
+      
+      this.group.add(filledZone);
+    }
+  },
+
+  addImpactZoneInfo(centerLat, centerLon, zones) {
+    // Create info display for the impact zones
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 10px;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      max-width: 300px;
+      z-index: 1500;
+      border-left: 4px solid #ff6600;
+    `
+    
+    const formatDistance = (distance_m) => {
+      if (!distance_m || isNaN(distance_m)) return 'N/A';
+      if (distance_m < 1000) return `${Math.round(distance_m)} m`;
+      return `${(distance_m / 1000).toFixed(1)} km`;
+    };
+    
+    infoDiv.innerHTML = `
+      <h4 style="margin: 0 0 10px 0; color: #ff6600;">Impact Zones</h4>
+      <div style="font-size: 11px; margin-bottom: 10px;">
+        Location: ${centerLat.toFixed(3)}°, ${centerLon.toFixed(3)}°
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #8B0000;">●</span> Crater: ${formatDistance(zones.crater.D_final_m)} (100% mortality)
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #FF4500;">●</span> Fireball: ${formatDistance(zones.fireball50_m)} (50% mortality)
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #FF1493;">●</span> Overpressure: ${formatDistance(zones.overpressure50_m)} (50% mortality)
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #9370DB;">●</span> Wind Blast: ${formatDistance(zones.wind50_m)} (50% mortality)
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #32CD32;">●</span> Seismic: ${formatDistance(zones.seismic50_m)} (50% mortality)
+      </div>
+      <div style="margin-top: 10px; font-size: 10px; color: #ccc;">
+        Energy: ${(zones.energy_J / 4.184e12).toFixed(2)} kt TNT<br>
+        Click elsewhere to dismiss
+      </div>
+    `
+    
+    document.body.appendChild(infoDiv)
+    
+    // Remove info display after 10 seconds or on next click
+    const removeInfo = () => {
+      if (infoDiv.parentNode) {
+        document.body.removeChild(infoDiv);
+      }
+      document.removeEventListener('click', removeInfo);
+    };
+    
+    setTimeout(removeInfo, 10000);
+    document.addEventListener('click', removeInfo);
+  },
+
+  // ...existing code...
+
+  createImpactFlash(impactPosition, asteroidSize = 100, speed = 10) {
+    // Create a bright flash at impact point, scale with asteroid size and speed
+    const baseScale = 0.5; // Larger base scale
+    const baseDuration = 3000; // Longer duration (3 seconds)
+    const scaleFactor = Math.max(1, asteroidSize / 100); // Scale based on asteroid size
+    const speedFactor = Math.max(1, speed / 10); // speed in km/s, normalized
+    const initialScale = baseScale * scaleFactor;
+    const finalScale = initialScale * 3.0; // Larger final scale
+    // Duration: baseDuration * sqrt(scaleFactor * speedFactor)
+    const duration = baseDuration * Math.sqrt(scaleFactor * speedFactor);
+
+    const flashGeometry = new THREE.SphereGeometry(1, 16, 16);
+    const flashMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xffffff, // Bright white flash
+      transparent: true,
+      opacity: 1
+    });
+    
+    const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+    const surfacePosition = impactPosition.clone().normalize().multiplyScalar(10.1);
+    flash.position.copy(surfacePosition);
+    
+    this.group.add(flash);
+    
+    flash.scale.set(initialScale, initialScale, initialScale);
+    const startTime = Date.now();
+    const fadeOut = () => {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const scale = initialScale + (finalScale - initialScale) * t;
+      flash.scale.set(scale, scale, scale);
+      flash.material.opacity = 1 - t;
+      
+      // Color transition from white to orange to red
+      if (t < 0.3) {
+        flash.material.color.setHex(0xffffff); // White
+      } else if (t < 0.6) {
+        flash.material.color.setHex(0xffaa00); // Orange
+      } else {
+        flash.material.color.setHex(0xff4400); // Red
+      }
+      
+      if (t < 1) {
+        requestAnimationFrame(fadeOut);
+      } else {
+        this.group.remove(flash);
+        flash.geometry.dispose();
+        flash.material.dispose();
+      }
+    };
+    fadeOut();
+  },
+
+  async createOrbitalPaths() {
+    console.log('Starting to create orbital paths using imported data...');
+    // Use the imported asteroid data directly
+
+    const asteroidData = asteroidOrbitData;
+    console.log('Using imported asteroid data:', Object.keys(asteroidData).length, 'asteroids');
+    
+    // Process the imported data
+    this.processAsteroidData(asteroidData);
+  },
+
+  processAsteroidData(asteroidData) {
+    console.log('Processing asteroid data...');
+    
+    // Much smaller scale factor - the coordinates are in km and are huge!
+    const scaleFactor = 0.0000002; // Very small scale factor for km coordinates
+    const earthRadius = 10; // Our Earth radius in Three.js units
+    const minOrbitRadius = earthRadius + 5; // Close to Earth surface
+    
+    // Bright neon color palette for different orbital paths
+    const colors = [
+      0x00ff00, 0xff0080, 0x00ffff, 0xffff00, 0xff4000,
+      0x8000ff, 0xff8000, 0x0080ff, 0xff00ff, 0x40ff00
+    ];
+    
+    let colorIndex = 0;
+    let pathCount = 0;
+    const maxPaths = 10; // Show more asteroids now that scaling works
+    
+    // Process real asteroid data
+    console.log(`Starting to process ${Object.keys(asteroidData).length} asteroids...`);
+    
+    for (const [asteroidName, coordinates] of Object.entries(asteroidData)) {
+      if (pathCount >= maxPaths) break;
+      
+      console.log(`\n--- Processing asteroid ${pathCount + 1}/${maxPaths}: ${asteroidName} ---`);
+      console.log(`Raw coordinates length: ${coordinates.length}`);
+      
+      // Sample fewer coordinates for debugging the scale
+      const sampledCoords = coordinates.filter((_, index) => index % 20 === 0).slice(0, 10); // Only first 10 sampled points
+      console.log(`Sampled coordinates: ${sampledCoords.length} points`);
+      
+      if (sampledCoords.length < 5) {
+        console.log(`Skipping ${asteroidName} - too few points (${sampledCoords.length} < 5)`);
+        continue;
+      }
+      
+      // Convert coordinates and scale them
+      const pathPoints = sampledCoords.map((coord, index) => {
+        if (!Array.isArray(coord) || coord.length < 3) {
+          console.warn(`Invalid coordinate at index ${index}:`, coord);
+          return null;
+        }
+        
+        const [x, y, z] = coord;
+        
+        // Scale down the coordinates
+        let scaledX = x * scaleFactor;
+        let scaledY = y * scaleFactor;
+        let scaledZ = z * scaleFactor;
+        
+        console.log(`Raw coords: (${x.toFixed(0)}, ${y.toFixed(0)}, ${z.toFixed(0)}) -> Scaled: (${scaledX.toFixed(2)}, ${scaledY.toFixed(2)}, ${scaledZ.toFixed(2)})`);
+        
+        // Calculate distance from origin and ensure minimum distance
+        const distance = Math.sqrt(scaledX * scaledX + scaledY * scaledY + scaledZ * scaledZ);
+        if (distance < minOrbitRadius) {
+          const ratio = minOrbitRadius / distance;
+          scaledX *= ratio;
+          scaledY *= ratio;
+          scaledZ *= ratio;
+          console.log(`Adjusted to minimum distance: (${scaledX.toFixed(2)}, ${scaledY.toFixed(2)}, ${scaledZ.toFixed(2)})`);
+        }
+        
+        return new THREE.Vector3(scaledX, scaledY, scaledZ);
+      }).filter(point => point !== null);
+      
+      console.log(`Created ${pathPoints.length} valid path points for ${asteroidName}`);
+      console.log(`Sample points:`, pathPoints.slice(0, 3).map(p => `(${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`));
+      console.log(`Distance from origin (first point): ${pathPoints[0].length().toFixed(1)} units`);
+      
+      // Create truly smooth orbital paths by fitting elliptical curves to the data
+      console.log('Creating smooth elliptical orbital path...');
+      
+      // Analyze the asteroid coordinates to find orbital parameters
+      const centerX = pathPoints.reduce((sum, p) => sum + p.x, 0) / pathPoints.length;
+      const centerY = pathPoints.reduce((sum, p) => sum + p.y, 0) / pathPoints.length;
+      const centerZ = pathPoints.reduce((sum, p) => sum + p.z, 0) / pathPoints.length;
+      const center = new THREE.Vector3(centerX, centerY, centerZ);
+      
+      // Find the average distance to determine orbit size
+      const distances = pathPoints.map(p => p.distanceTo(center));
+      const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+      const maxDistance = Math.max(...distances);
+      const minDistance = Math.min(...distances);
+      
+      // Create a smooth elliptical orbit based on the data
+      const semiMajorAxis = (maxDistance + minDistance) / 2;
+      const semiMinorAxis = semiMajorAxis * 0.8; // Slightly elliptical
+      
+      // Find the orbital plane orientation by analyzing the data spread
+      const firstPoint = pathPoints[0].clone().sub(center).normalize();
+      const midPoint = pathPoints[Math.floor(pathPoints.length / 2)].clone().sub(center).normalize();
+      const normal = firstPoint.clone().cross(midPoint).normalize();
+      const tangent = firstPoint.clone();
+      const bitangent = normal.clone().cross(tangent).normalize();
+      
+      // Generate perfectly smooth elliptical points
+      const numSmoothPoints = 200; // Many points for perfect smoothness
+      const interpolatedPoints = [];
+      
+      for (let i = 0; i < numSmoothPoints; i++) {
+        const angle = (i / numSmoothPoints) * Math.PI * 2;
+        
+        // Create elliptical coordinates
+        const x = Math.cos(angle) * semiMajorAxis;
+        const y = Math.sin(angle) * semiMinorAxis;
+        
+        // Transform to 3D orbital plane
+        const point = center.clone()
+          .add(tangent.clone().multiplyScalar(x))
+          .add(bitangent.clone().multiplyScalar(y))
+          .add(normal.clone().multiplyScalar(Math.sin(angle * 2) * semiMajorAxis * 0.1)); // Small vertical variation
+        
+        interpolatedPoints.push(point);
+      }
+      
+      console.log(`Created ${interpolatedPoints.length} perfectly smooth elliptical orbit points`);
+      
+      // Use the interpolated points for creating the orbital path
+      const finalPathPoints = interpolatedPoints;
+      
+      // Create the orbital path geometry using visible mesh tubes instead of lines
+      const pathGeometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
+      
+      console.log(`Creating orbital path with color: 0x${colors[colorIndex % colors.length].toString(16)}`);
+      
+      // Create tube geometry using the perfectly smooth elliptical curve
+      const smoothCurve = new THREE.CatmullRomCurve3(finalPathPoints, true, 'catmullrom', 0);
+      const tubeGeometry = new THREE.TubeGeometry(smoothCurve, 100, 0.5, 16, true); // High resolution
+      const tubeMaterial = new THREE.MeshBasicMaterial({
+        color: colors[colorIndex % colors.length],
+        transparent: true,
+        opacity: 0.7
+      });
+      const orbitTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+      
+      // Create bright spheres at evenly distributed points  
+      const spheres = [];
+      finalPathPoints.forEach((point, index) => {
+        if (index % 25 === 0) { // Evenly spaced markers
+          const sphereGeometry = new THREE.SphereGeometry(0.4, 8, 8);
+          const sphereMaterial = new THREE.MeshBasicMaterial({
+            color: colors[colorIndex % colors.length],
+            transparent: true,
+            opacity: 0.8
+          });
+          const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+          sphere.position.copy(point);
+          spheres.push(sphere);
+        }
+      });
+      
+      // Add userData to the tube
+      orbitTube.userData = {
+        asteroidName: asteroidName,
+        originalPoints: finalPathPoints, // Use interpolated points
+        currentIndex: 0,
+        speed: 0.2 + Math.random() * 0.3
+      };
+      
+      // Add to scene and array
+      console.log(`✓ Successfully added orbital path for ${asteroidName} with ${pathPoints.length} points`);
+      console.log(`  Color: 0x${colors[colorIndex % colors.length].toString(16)}`);
+      console.log(`  Tube radius: 2.0, ${spheres.length} marker spheres`);
+      
+      this.group.add(orbitTube);
+      this.orbitalPaths.push(orbitTube);
+      
+      // Create a larger moving asteroid on this orbit using interpolated points
+      this.createOrbitingAsteroid(finalPathPoints, colors[colorIndex % colors.length], asteroidName);
+      
+      colorIndex++;
+      pathCount++;
+    }
+    
+    console.log(`\n=== ORBITAL PATHS SUMMARY ===`);
+    console.log(`Created ${pathCount} asteroid orbits out of ${Object.keys(asteroidData).length} available`);
+    console.log(`Total orbital elements: ${this.orbitalPaths.length} (paths + glows + asteroids)`);
+    console.log(`Camera position: x=${camera.position.x}, y=${camera.position.y}, z=${camera.position.z}`);
+    console.log(`Earth group position: x=${this.group.position.x}, y=${this.group.position.y}, z=${this.group.position.z}`);
+    console.log('Orbital paths should now be visible around Earth with neon colors');
+    console.log('Use mouse to orbit around and zoom in/out to find the orbital paths');
+    console.log('================================\n');
+  },
+
+  createOrbitingAsteroid(pathPoints, color, name) {
+    // Create a realistic asteroid
+    const asteroidGeometry = new THREE.IcosahedronGeometry(0.4, 1); // Smaller, more realistic size
+    
+    // Deform the geometry for irregular asteroid shape
+    const positions = asteroidGeometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+      const vertex = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]);
+      const displacement = (Math.random() - 0.5) * 0.1;
+      const normal = vertex.clone().normalize();
+      vertex.add(normal.multiplyScalar(displacement));
+      positions[i] = vertex.x;
+      positions[i + 1] = vertex.y;
+      positions[i + 2] = vertex.z;
+    }
+    asteroidGeometry.attributes.position.needsUpdate = true;
+    asteroidGeometry.computeVertexNormals();
+    
+    const asteroidMaterial = new THREE.MeshStandardMaterial({
+      color: this.generateRealisticAsteroidColor(),
+      roughness: 0.9,
+      metalness: 0.1,
+      transparent: false
+    });
+    
+    const orbitingAsteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
+    
+    // Create a large glowing sphere around the asteroid for visibility
+    const glowGeometry = new THREE.SphereGeometry(2.0, 16, 16); // Large glow sphere
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide
+    });
+    const glowSphere = new THREE.Mesh(glowGeometry, glowMaterial);
+    
+    // Create an even larger outer glow for extra visibility
+    const outerGlowGeometry = new THREE.SphereGeometry(3.5, 12, 12);
+    const outerGlowMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.DoubleSide
+    });
+    const outerGlowSphere = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
+    
+    orbitingAsteroid.userData = {
+      pathPoints: pathPoints,
+      currentIndex: 0,
+      speed: 0.005 + Math.random() * 0.01, // Much much slower movement
+      name: name,
+      rotationSpeed: {
+        x: (Math.random() - 0.5) * 0.001, // Much slower rotation
+        y: (Math.random() - 0.5) * 0.001,
+        z: (Math.random() - 0.5) * 0.001
+      },
+      glowSphere: glowSphere,
+      outerGlowSphere: outerGlowSphere
+    };
+    
+    // Set initial positions for all elements
+    if (pathPoints.length > 0) {
+      orbitingAsteroid.position.copy(pathPoints[0]);
+      glowSphere.position.copy(pathPoints[0]);
+      outerGlowSphere.position.copy(pathPoints[0]);
+      console.log(`Created orbiting asteroid for ${name} at position:`, pathPoints[0]);
+    }
+    
+    this.group.add(orbitingAsteroid);
+    this.group.add(glowSphere);
+    this.group.add(outerGlowSphere);
+    this.orbitalPaths.push(orbitingAsteroid);
+    this.orbitalPaths.push(glowSphere);
+    this.orbitalPaths.push(outerGlowSphere);
+  },
+
+  generateRealisticAsteroidColor() {
+    // Generate realistic asteroid colors (grays, browns, dark colors)
+    const baseColors = [
+      0x444444, // Dark gray
+      0x666666, // Medium gray  
+      0x553322, // Dark brown
+      0x664433, // Medium brown
+      0x332211, // Very dark brown
+      0x555544, // Grayish brown
+      0x333333, // Very dark gray
+    ];
+    
+    const baseColor = baseColors[Math.floor(Math.random() * baseColors.length)];
+    
+    // Add slight variation
+    const r = ((baseColor >> 16) & 0xff) / 255;
+    const g = ((baseColor >> 8) & 0xff) / 255;
+    const b = (baseColor & 0xff) / 255;
+    
+    const variation = 0.1;
+    const newR = Math.max(0, Math.min(1, r + (Math.random() - 0.5) * variation));
+    const newG = Math.max(0, Math.min(1, g + (Math.random() - 0.5) * variation));
+    const newB = Math.max(0, Math.min(1, b + (Math.random() - 0.5) * variation));
+    
+    return new THREE.Color(newR, newG, newB);
+  },
+
   updateAsteroids() {
     const currentTime = Date.now()
     
@@ -1223,89 +1820,268 @@ let app = {
         // Impact! Remove asteroid and create crater
         this.group.remove(asteroid)
         this.asteroids.splice(i, 1)
-  this.createImpactCrater(userData.targetPosition, userData.realSizeMeters, params.asteroidSpeed)
+        this.createImpactCrater(userData.targetPosition, userData.realSizeMeters, params.asteroidSpeed)
       }
     }
   },
 
   createImpactCrater(impactPosition, realSizeMeters, speed = params.asteroidSpeed) {
-    // Scale crater radius based on asteroid size (1m = 0.1, 1.5km = 3.0)
-    const craterRadius = Math.max(0.1, Math.min(3.0, realSizeMeters / 500));
-    this.impactSites.push({
-      position: impactPosition.clone(),
-      radius: craterRadius,
-      depth: 0.3
-    });
-    // Deform Earth geometry at impact point
-    this.deformEarth(impactPosition, craterRadius);
-    // Create permanent orange impact marker
-    this.createPermanentImpactMarker(impactPosition, craterRadius);
-    // Create impact flash effect, scale with craterRadius and speed
-    this.createImpactFlash(impactPosition, craterRadius, speed);
+    // Calculate impact zones using the imported physics model
+    this.calculateAndVisualizeImpactZones(impactPosition, realSizeMeters, speed * 1000); // Convert km/s to m/s
+    
+    // Create impact flash effect
+    this.createImpactFlash(impactPosition, realSizeMeters, speed);
   },
 
-  deformEarth(impactPosition, craterRadius) {
-    const earthGeometry = this.earth.geometry;
-    const positionAttribute = earthGeometry.attributes.position;
-    const vertex = new THREE.Vector3();
-    // Convert impact position from group coordinates to Earth's local coordinates
-    const earthLocalImpact = this.earth.worldToLocal(this.group.localToWorld(impactPosition.clone()));
-    // Deform vertices near the impact point
-    for (let i = 0; i < positionAttribute.count; i++) {
-      vertex.fromBufferAttribute(positionAttribute, i);
-      const distance = vertex.distanceTo(earthLocalImpact);
-      if (distance < craterRadius) {
-        // Calculate deformation strength based on distance and crater size
-        const deformationStrength = (1 - distance / craterRadius) * Math.min(0.8, craterRadius * 0.2);
-        // Pull vertex inward toward Earth center
-        const direction = vertex.clone().normalize();
-        vertex.sub(direction.multiplyScalar(deformationStrength));
-        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+
+  calculateAndVisualizeImpactZones(impactPosition, asteroidDiameter_m, speed_ms) {
+    // Use realistic material densities and impact angles
+    const impactParams = {
+      L0_m: asteroidDiameter_m,
+      rho_i: 3100,      // kg/m³ (typical stony asteroid density)
+      rho_t: 2500,      // kg/m³ (typical sedimentary rock density)
+      v_ms: speed_ms,
+      gamma_deg: 45,    // 45° impact angle
+      luminousEfficiency: 1e-3  // typical luminous efficiency
+    };
+
+    // Calculate impact zones using Rumpf (2016) physics model
+    const zones = ImpactZones.computeAll(impactParams);
+    
+    console.log('Impact zones calculated:', zones);
+    
+    // Convert world coordinates to lat/lon for zone calculation
+    const impactCoords = vector3ToLatLon(impactPosition);
+    const impactLat = impactCoords.lat;
+    const impactLon = impactCoords.lon;
+    
+    // Create visual zones on Earth surface
+    this.createImpactZoneVisualization(impactLat, impactLon, zones);
+  },
+
+  createImpactZoneVisualization(centerLat, centerLon, zones) {
+    // Zone configurations with colors and transparency
+    const zoneConfigs = [
+      {
+        name: 'crater',
+        radius_m: zones.crater.D_final_m / 2,
+        color: 0x8B0000,  // Dark red - 100% mortality
+        opacity: 0.8,
+        label: 'Crater (100% mortality)'
+      },
+      {
+        name: 'fireball',
+        radius_m: zones.fireball50_m,
+        color: 0xFF4500,  // Orange-red - thermal radiation
+        opacity: 0.6,
+        label: 'Fireball (50% mortality)'
+      },
+      {
+        name: 'overpressure', 
+        radius_m: zones.overpressure50_m,
+        color: 0xFF1493,  // Deep pink - blast overpressure
+        opacity: 0.5,
+        label: 'Overpressure (50% mortality)'
+      },
+      {
+        name: 'wind',
+        radius_m: zones.wind50_m,
+        color: 0x9370DB,  // Medium purple - wind blast
+        opacity: 0.4,
+        label: 'Wind Blast (50% mortality)'
+      },
+      {
+        name: 'seismic',
+        radius_m: zones.seismic50_m,
+        color: 0x32CD32,  // Lime green - seismic/earthquake
+        opacity: 0.3,
+        label: 'Seismic (50% mortality)'
       }
-    }
-    positionAttribute.needsUpdate = true;
-    earthGeometry.computeVertexNormals(); // Recalculate normals for proper lighting
-  },
+    ];
 
-  createPermanentImpactMarker(impactPosition, craterRadius) {
-    // Create permanent orange crater marker scaled to impact size
-    const markerGeometry = new THREE.SphereGeometry(craterRadius, 16, 16);
-    const markerMaterial = new THREE.MeshBasicMaterial({ 
-      color: 0xff6600, // Bright orange
-      transparent: true,
-      opacity: 0.8
+    // Sort zones by radius (largest first) so they render properly
+    zoneConfigs.sort((a, b) => (b.radius_m || 0) - (a.radius_m || 0));
+
+    // Create each zone as a circle on Earth's surface
+    zoneConfigs.forEach(config => {
+      if (config.radius_m && !isNaN(config.radius_m) && config.radius_m > 0) {
+        this.createImpactZoneCircle(centerLat, centerLon, config);
+      }
     });
-    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-    // Position marker slightly above surface at impact point
-    const surfaceNormal = impactPosition.clone().normalize();
-    const markerPosition = impactPosition.clone().add(surfaceNormal.multiplyScalar(0.05));
-    marker.position.copy(markerPosition);
-    // Scale marker to be flat against the surface (flatten along Z-axis)
-    marker.scale.set(1, 1, 0.1);
-    // Orient marker so its local Z-axis points along the surface normal (outward from sphere)
-    const target = markerPosition.clone().add(surfaceNormal);
-    marker.lookAt(target);
-    // Add to group so it rotates with Earth
-    this.group.add(marker);
+
+    // Add legend/info display for this impact
+    this.addImpactZoneInfo(centerLat, centerLon, zones);
   },
 
-  createImpactFlash(impactPosition, craterRadius = 1, speed = 10) {
-    // Create a bright flash at impact point, scale with craterRadius and speed
-    // Flash size: proportional to craterRadius (asteroid size)
-    // Flash duration: proportional to sqrt(kinetic energy) for visual effect
-    // (Kinetic energy ~ 0.5 * m * v^2, but for visuals, sqrt is more pleasing)
-    const baseScale = 0.2;
-    const baseDuration = 500; // ms
-    const scaleFactor = Math.max(1, craterRadius * 1.2); // craterRadius in km, scale up
+  createImpactZoneCircle(centerLat, centerLon, config) {
+    const radius_m = config.radius_m;
+    const earthRadius_m = 6371000; // Earth radius in meters
+    
+    // Convert radius to angular distance (radians)
+    const angularRadius = radius_m / earthRadius_m;
+    
+    // Create circle geometry points around the impact center
+    const segments = 64;
+    const points = [];
+    
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      
+      // Calculate point on circle using spherical trigonometry
+      const deltaLat = angularRadius * Math.cos(angle);
+      const deltaLon = angularRadius * Math.sin(angle) / Math.cos(centerLat * Math.PI / 180);
+      
+      const lat = centerLat + (deltaLat * 180 / Math.PI);
+      const lon = centerLon + (deltaLon * 180 / Math.PI);
+      
+      // Convert to 3D position slightly above Earth surface
+      const position = latLonToVector3(lat, lon, 10.02 + config.opacity * 0.1);
+      points.push(position);
+    }
+    
+    // Create the zone circle geometry
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color: config.color,
+      transparent: true,
+      opacity: config.opacity,
+      linewidth: 3
+    });
+    
+    const circle = new THREE.Line(geometry, material);
+    circle.userData = {
+      type: 'impactZone',
+      zoneName: config.name,
+      label: config.label,
+      radius_m: radius_m
+    };
+    
+    // Add to scene
+    this.group.add(circle);
+    
+    // Also create a filled zone for better visibility
+    if (config.name === 'crater' || config.name === 'fireball') {
+      this.createFilledZone(points, config);
+    }
+  },
+
+  createFilledZone(points, config) {
+    // Create a filled circular area for high-mortality zones
+    const shape = new THREE.Shape();
+    
+    if (points.length > 0) {
+      // Project points to local 2D coordinate system for shape creation
+      const center = points[0].clone();
+      shape.moveTo(0, 0);
+      
+      for (let i = 1; i < points.length; i++) {
+        const localPoint = points[i].clone().sub(center);
+        shape.lineTo(localPoint.x, localPoint.y);
+      }
+      shape.closePath();
+      
+      const geometry = new THREE.ShapeGeometry(shape);
+      const material = new THREE.MeshBasicMaterial({
+        color: config.color,
+        transparent: true,
+        opacity: config.opacity * 0.3,
+        side: THREE.DoubleSide
+      });
+      
+      const filledZone = new THREE.Mesh(geometry, material);
+      filledZone.position.copy(center);
+      filledZone.lookAt(new THREE.Vector3(0, 0, 0)); // Face toward Earth center
+      
+      filledZone.userData = {
+        type: 'impactZoneFill',
+        zoneName: config.name + '_fill'
+      };
+      
+      this.group.add(filledZone);
+    }
+  },
+
+  addImpactZoneInfo(centerLat, centerLon, zones) {
+    // Create info display for the impact zones
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 10px;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      max-width: 300px;
+      z-index: 1500;
+      border-left: 4px solid #ff6600;
+    `
+    
+    const formatDistance = (distance_m) => {
+      if (!distance_m || isNaN(distance_m)) return 'N/A';
+      if (distance_m < 1000) return `${Math.round(distance_m)} m`;
+      return `${(distance_m / 1000).toFixed(1)} km`;
+    };
+    
+    infoDiv.innerHTML = `
+      <h4 style="margin: 0 0 10px 0; color: #ff6600;">Impact Zones</h4>
+      <div style="font-size: 11px; margin-bottom: 10px;">
+        Location: ${centerLat.toFixed(3)}°, ${centerLon.toFixed(3)}°
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #8B0000;">●</span> Crater: ${formatDistance(zones.crater.D_final_m)}
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #FF4500;">●</span> Fireball: ${formatDistance(zones.fireball50_m)}
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #FF1493;">●</span> Overpressure: ${formatDistance(zones.overpressure50_m)}
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #9370DB;">●</span> Wind Blast: ${formatDistance(zones.wind50_m)}
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #32CD32;">●</span> Seismic: ${formatDistance(zones.seismic50_m)}
+      </div>
+      <div style="margin-top: 10px; font-size: 10px; color: #ccc;">
+        Energy: ${(zones.energy_J / 4.184e12).toFixed(2)} kt TNT<br>
+        Click elsewhere to dismiss
+      </div>
+    `
+    
+    document.body.appendChild(infoDiv)
+    
+    // Remove info display after 10 seconds or on next click
+    const removeInfo = () => {
+      if (infoDiv.parentNode) {
+        document.body.removeChild(infoDiv);
+      }
+      document.removeEventListener('click', removeInfo);
+    };
+    
+    setTimeout(removeInfo, 10000);
+    document.addEventListener('click', removeInfo);
+  },
+
+  // ...existing code...
+
+  createImpactFlash(impactPosition, asteroidSize = 100, speed = 10) {
+    // Create a bright flash at impact point, scale with asteroid size and speed
+    const baseScale = 0.5; // Larger base scale
+    const baseDuration = 3000; // Longer duration (3 seconds)
+    const scaleFactor = Math.max(1, asteroidSize / 100); // Scale based on asteroid size
     const speedFactor = Math.max(1, speed / 10); // speed in km/s, normalized
     const initialScale = baseScale * scaleFactor;
-    const finalScale = initialScale * 2.5;
+    const finalScale = initialScale * 3.0; // Larger final scale
     // Duration: baseDuration * sqrt(scaleFactor * speedFactor)
     const duration = baseDuration * Math.sqrt(scaleFactor * speedFactor);
 
     const flashGeometry = new THREE.SphereGeometry(1, 16, 16);
     const flashMaterial = new THREE.MeshBasicMaterial({ 
-      color: 0xffaa00,
+      color: 0xffffff, // Bright white flash
       transparent: true,
       opacity: 1
     });
@@ -1324,6 +2100,16 @@ let app = {
       const scale = initialScale + (finalScale - initialScale) * t;
       flash.scale.set(scale, scale, scale);
       flash.material.opacity = 1 - t;
+      
+      // Color transition from white to orange to red
+      if (t < 0.3) {
+        flash.material.color.setHex(0xffffff); // White
+      } else if (t < 0.6) {
+        flash.material.color.setHex(0xffaa00); // Orange
+      } else {
+        flash.material.color.setHex(0xff4400); // Red
+      }
+      
       if (t < 1) {
         requestAnimationFrame(fadeOut);
       } else {
@@ -1338,12 +2124,12 @@ let app = {
   async createOrbitalPaths() {
     console.log('Starting to create orbital paths using imported data...');
     // Use the imported asteroid data directly
+
     const asteroidData = asteroidOrbitData;
     console.log('Using imported asteroid data:', Object.keys(asteroidData).length, 'asteroids');
     
     // Process the imported data
     this.processAsteroidData(asteroidData);
-      
   },
 
   processAsteroidData(asteroidData) {
@@ -1689,6 +2475,7 @@ let app = {
 }
 
 runApp(app, scene, renderer, camera, true, undefined, undefined)
+
 
 // Store app reference globally for HTML interface
 window.appInstance = app
