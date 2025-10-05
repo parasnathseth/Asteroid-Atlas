@@ -308,19 +308,12 @@ const ImpactZones = (function () {
         Location: ${centerLat.toFixed(3)}°, ${centerLon.toFixed(3)}°
       </div>
       <div style="margin-bottom: 5px;">
-        <span style="color: #8B0000;">●</span> Crater: ${formatDistance(zones.crater.D_final_m)}
+        <span style="color: #8B0000;">●</span> Crater: ${formatDistance(zones.crater.D_final_m)} (100% mortality)
       </div>
       <div style="margin-bottom: 5px;">
-        <span style="color: #FF4500;">●</span> Fireball: ${formatDistance(zones.fireball50_m)}
+        <span style="color: #FF4500;">●</span> Fireball: ${formatDistance(zones.fireball50_m)} (50% mortality)
       </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #FF1493;">●</span> Overpressure: ${formatDistance(zones.overpressure50_m)}
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #9370DB;">●</span> Wind Blast: ${formatDistance(zones.wind50_m)}
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #32CD32;">●</span> Seismic: ${formatDistance(zones.seismic50_m)}
+
       </div>
       <div style="margin-top: 10px; font-size: 10px; color: #ccc;">
         Energy: ${(zones.energy_J / 4.184e12).toFixed(2)} kt TNT<br>

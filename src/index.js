@@ -637,7 +637,7 @@ let app = {
       <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
         V<sub>thermal</sub>(φ) = 1 / (1 + e<sup>-0.00000562327(φ - 731641.664)</sup>)
       </div>
-
+      
       <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">💨 3. Overpressure (Shockwave Zone)</h2>
       <p><strong>Purpose:</strong> determine radius where blast overpressure causes 50% mortality.</p>
 
@@ -1105,12 +1105,12 @@ let app = {
     // 1 unit = ~637km, so 1m = 1/637000 units
     const asteroidRadius = (sizeInMeters / 2) / 637000;
     // Scale up for visibility (min 0.05, max 2.0 units)
-    const visualSize = Math.max(0.05, Math.min(2.0, asteroidRadius * 50000));
+    const visualSize = asteroidRadius * 1000;
 
     // Generate random asteroid properties
     const randomDetail = Math.floor(Math.random() * 2) + 1;
     const randomColor = this.generateRandomAsteroidColor();
-    const asteroidGeometry = new THREE.IcosahedronGeometry(visualSize, randomDetail);
+    const asteroidGeometry = new THREE.SphereGeometry(visualSize, 8 * randomDetail, 6 * randomDetail);
     this.deformAsteroidGeometry(asteroidGeometry, visualSize);
     const asteroidMaterial = new THREE.MeshStandardMaterial({
       color: randomColor,
@@ -1282,12 +1282,9 @@ let app = {
     };
     
     // Add to scene
-    this.group.add(circle);
+    this.group.add(circle)
     
-    // Also create a filled zone for better visibility
-    if (config.name === 'crater' || config.name === 'fireball') {
-      this.createFilledZone(points, config);
-    }
+   
   },
 
   // Create impact flash effect
@@ -1502,11 +1499,7 @@ let app = {
         currentIndex: 0,
         speed: 0.2 + Math.random() * 0.3
       };
-      
-      // Add to scene and array
-      console.log(`✓ Successfully added orbital path for ${asteroidName} with ${pathPoints.length} points`);
-      console.log(`  Color: 0x${colors[colorIndex % colors.length].toString(16)}`);
-      console.log(`  Tube radius: 2.0, ${spheres.length} marker spheres`);
+    
       
       this.group.add(orbitTube);
       this.orbitalPaths.push(orbitTube);
@@ -1580,37 +1573,37 @@ let app = {
         name: 'crater',
         radius_m: zones.crater.D_final_m / 2,
         color: 0x8B0000,  // Dark red - 100% mortality
-        opacity: 0.8,
+        opacity: 1.0,
         label: 'Crater (100% mortality)'
       },
       {
         name: 'fireball',
         radius_m: zones.fireball50_m,
         color: 0xFF4500,  // Orange-red - thermal radiation
-        opacity: 0.6,
+        opacity: 1.0,
         label: 'Fireball (50% mortality)'
       },
-      {
-        name: 'overpressure', 
-        radius_m: zones.overpressure50_m,
-        color: 0xFF1493,  // Deep pink - blast overpressure
-        opacity: 0.5,
-        label: 'Overpressure (50% mortality)'
-      },
-      {
-        name: 'wind',
-        radius_m: zones.wind50_m,
-        color: 0x9370DB,  // Medium purple - wind blast
-        opacity: 0.4,
-        label: 'Wind Blast (50% mortality)'
-      },
-      {
-        name: 'seismic',
-        radius_m: zones.seismic50_m,
-        color: 0x32CD32,  // Lime green - seismic/earthquake
-        opacity: 0.3,
-        label: 'Seismic (50% mortality)'
-      }
+      // {
+      //   name: 'overpressure', 
+      //   radius_m: zones.overpressure50_m,
+      //   color: 0xFF1493,  // Deep pink - blast overpressure
+      //   opacity: 1.0,
+      //   label: 'Overpressure (50% mortality)'
+      // },
+      // {
+      //   name: 'wind',
+      //   radius_m: zones.wind50_m,
+      //   color: 0x9370DB,  // Medium purple - wind blast
+      //   opacity: 1.0,
+      //   label: 'Wind Blast (50% mortality)'
+      // },
+      // {
+      //   name: 'seismic',
+      //   radius_m: zones.seismic50_m,
+      //   color: 0x32CD32,  // Lime green - seismic/earthquake
+      //   opacity: 1.0,
+      //   label: 'Seismic (50% mortality)'
+      // }
     ];
 
     // Sort zones by radius (largest first) so they render properly
@@ -1664,11 +1657,9 @@ let app = {
   },
 
   async createOrbitalPaths() {
-    console.log('Starting to create orbital paths using imported data...');
-    // Use the imported asteroid data directly
 
     const asteroidData = asteroidOrbitData;
-    console.log('Using imported asteroid data:', Object.keys(asteroidData).length, 'asteroids');
+    
     
     // Process the imported data
     this.processAsteroidData(asteroidData);
@@ -1722,6 +1713,38 @@ let app = {
     });
     const outerGlowSphere = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
     
+    // Create text label for asteroid name
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 512;
+    canvas.height = 128;
+    
+    // Set up text styling
+    context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    
+    context.fillStyle = '#ffffff';
+    context.font = 'bold 36px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    
+    // Draw the asteroid name
+    const displayName = name.length > 20 ? name.substring(0, 17) + '...' : name;
+    context.fillText(displayName, canvas.width / 2, canvas.height / 2);
+    
+    // Create texture from canvas
+    const labelTexture = new THREE.CanvasTexture(canvas);
+    labelTexture.needsUpdate = true;
+    
+    // Create sprite for the label
+    const labelMaterial = new THREE.SpriteMaterial({ 
+      map: labelTexture,
+      transparent: true,
+      opacity: 0.9
+    });
+    const labelSprite = new THREE.Sprite(labelMaterial);
+    labelSprite.scale.set(8, 2, 1); // Scale the label appropriately
+    
     orbitingAsteroid.userData = {
       pathPoints: pathPoints,
       currentIndex: 0,
@@ -1733,7 +1756,8 @@ let app = {
         z: (Math.random() - 0.5) * 0.001
       },
       glowSphere: glowSphere,
-      outerGlowSphere: outerGlowSphere
+      outerGlowSphere: outerGlowSphere,
+      labelSprite: labelSprite
     };
     
     // Set initial positions for all elements
@@ -1741,15 +1765,23 @@ let app = {
       orbitingAsteroid.position.copy(pathPoints[0]);
       glowSphere.position.copy(pathPoints[0]);
       outerGlowSphere.position.copy(pathPoints[0]);
+      
+      // Position label above the asteroid
+      const labelPosition = pathPoints[0].clone();
+      labelPosition.add(new THREE.Vector3(0, 0, 4)); // Offset above asteroid
+      labelSprite.position.copy(labelPosition);
+      
       console.log(`Created orbiting asteroid for ${name} at position:`, pathPoints[0]);
     }
     
     this.group.add(orbitingAsteroid);
     this.group.add(glowSphere);
     this.group.add(outerGlowSphere);
+    this.group.add(labelSprite);
     this.orbitalPaths.push(orbitingAsteroid);
     this.orbitalPaths.push(glowSphere);
     this.orbitalPaths.push(outerGlowSphere);
+    this.orbitalPaths.push(labelSprite);
   },
 
   updateOrbitalPaths() {
@@ -1791,6 +1823,13 @@ let app = {
             }
             if (userData.outerGlowSphere) {
               userData.outerGlowSphere.position.copy(pathObject.position);
+            }
+            
+            // Move the label sprite and keep it above the asteroid
+            if (userData.labelSprite) {
+              const labelPosition = pathObject.position.clone();
+              labelPosition.add(new THREE.Vector3(0, 0, 4)); // Keep label above asteroid
+              userData.labelSprite.position.copy(labelPosition);
             }
           }
           
