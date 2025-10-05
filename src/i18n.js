@@ -4,6 +4,7 @@ import esTranslations from './locales/es.json'
 import frTranslations from './locales/fr.json'
 import deTranslations from './locales/de.json'
 import zhTranslations from './locales/zh.json'
+import ruTranslations from './locales/ru.json'
 
 class I18n {
   constructor() {
@@ -13,7 +14,8 @@ class I18n {
       'es': esTranslations,
       'fr': frTranslations,
       'de': deTranslations,
-      'zh': zhTranslations
+      'zh': zhTranslations,
+      'ru': ruTranslations
     };
     this.fallbackLanguage = 'en';
   }

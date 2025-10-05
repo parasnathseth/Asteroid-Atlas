@@ -242,6 +242,9 @@ let app = {
     // Add single click event listener for asteroid selection
     renderer.domElement.addEventListener('click', (event) => this.onAsteroidClick(event))
 
+    // Add touch event support for mobile devices
+    this.addTouchSupport(renderer)
+
     // Load and create asteroid orbital paths
     await this.createOrbitalPaths()
 
@@ -371,7 +374,7 @@ let app = {
       'Go to New York': () => this.goToLocation(40.7128, -74.0060),
       'Go to London': () => this.goToLocation(51.5074, -0.1278),
       'Go to Tokyo': () => this.goToLocation(35.6762, 139.6503),
-      'Go to Sydney': () => this.goToLocation(-33.8688, 151.2093),
+      'Go to Washington': () => this.goToLocation(38.9072, -77.0369),
       'Go to My Location': () => this.goToMyLocation(),
       'Go to Target': () => this.goToLocation(params.targetLat, params.targetLon),
       'Clear Markers': () => this.clearCustomMarkers()
@@ -381,7 +384,7 @@ let app = {
       coordFolder.add(locationActions, actionName)
     })
     
-    coordFolder.open()
+    coordFolder.close()
     // Add asteroid impact controls
     const asteroidFolder = gui.addFolder('Asteroid Impact')
     asteroidFolder.add(params, 'asteroidSize', 1, 5000).name('Size (meters)')
@@ -403,7 +406,7 @@ let app = {
     // Store reference for updates
     this.selectedAsteroidInfo = selectedAsteroidInfo
     
-    asteroidFolder.open()
+    asteroidFolder.close()
     
     // Add orbital paths controls
     const orbitalFolder = gui.addFolder('Orbital Paths')
@@ -412,7 +415,17 @@ let app = {
         pathObject.visible = value;
       });
     })
-    orbitalFolder.open()
+    
+    orbitalFolder.close()
+    
+    // Position dat.GUI to avoid overlap with other UI elements
+    gui.domElement.style.position = 'absolute'
+    gui.domElement.style.top = '10px'
+    gui.domElement.style.right = '480px' // Position it to the left of impact zones window
+    gui.domElement.style.zIndex = '999' // Lower z-index than other UI elements
+    
+    // Close the entire GUI panel by default
+    gui.close()
 
     // Stats - show fps
     this.stats1 = new Stats()
@@ -837,11 +850,28 @@ let app = {
       `
     }
     
-    // Calculate distance to target location
-    const distance = calculateDistance(lat, lon, params.targetLat, params.targetLon)
-    this.locationInfoDiv.innerHTML = `
-      <strong>${i18n.t('coordinates.distance_to_target')}:</strong> ${distance.toFixed(0)} ${i18n.t('measurements.kilometers')}
-    `
+  },
+
+  // Update control panel coordinates when clicking on Earth
+  updateControlPanelCoordinates(lat, lon) {
+    const latInput = document.getElementById('target-lat');
+    const lonInput = document.getElementById('target-lon');
+    
+    if (latInput && lonInput) {
+      latInput.value = lat.toFixed(4);
+      lonInput.value = lon.toFixed(4);
+      
+      // Add a brief visual feedback
+      latInput.style.backgroundColor = '#0066cc';
+      lonInput.style.backgroundColor = '#0066cc';
+      
+      setTimeout(() => {
+        latInput.style.backgroundColor = '#333';
+        lonInput.style.backgroundColor = '#333';
+      }, 500);
+      
+      console.log(`Control panel updated: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+    }
   },
 
   // Add temporary marker at clicked location
@@ -1156,6 +1186,9 @@ let app = {
         // Update coordinate display
         this.updateCoordinateDisplay(coords.lat, coords.lon, intersectionPoint)
         
+        // Update control panel coordinates
+        this.updateControlPanelCoordinates(coords.lat, coords.lon)
+        
         // Add a temporary marker at clicked location
         this.addTemporaryMarker(coords.lat, coords.lon)
       } else {
@@ -1236,6 +1269,95 @@ let app = {
     }
   },
 
+  // Add touch support for mobile devices
+  addTouchSupport(renderer) {
+    let touchStartTime = 0;
+    let touchStartPosition = { x: 0, y: 0 };
+    let lastTouchEnd = 0;
+    let touchTimeout = null;
+
+    // Prevent default touch behaviors to avoid scrolling issues
+    renderer.domElement.addEventListener('touchstart', (event) => {
+      event.preventDefault();
+      touchStartTime = Date.now();
+      
+      if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        touchStartPosition.x = touch.clientX;
+        touchStartPosition.y = touch.clientY;
+      }
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchmove', (event) => {
+      event.preventDefault();
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchend', (event) => {
+      event.preventDefault();
+      
+      if (event.changedTouches.length === 1) {
+        const touch = event.changedTouches[0];
+        const touchEndTime = Date.now();
+        const touchDuration = touchEndTime - touchStartTime;
+        const touchDistance = Math.sqrt(
+          Math.pow(touch.clientX - touchStartPosition.x, 2) + 
+          Math.pow(touch.clientY - touchStartPosition.y, 2)
+        );
+        
+        // Consider it a tap if touch duration is short and minimal movement
+        if (touchDuration < 500 && touchDistance < 30) {
+          const now = touchEndTime;
+          
+          // Double tap detection (within 300ms)
+          if (now - lastTouchEnd < 300) {
+            // Clear any pending single tap
+            if (touchTimeout) {
+              clearTimeout(touchTimeout);
+              touchTimeout = null;
+            }
+            
+            // Trigger double tap (asteroid impact)
+            const mouseEvent = new MouseEvent('dblclick', {
+              clientX: touch.clientX,
+              clientY: touch.clientY,
+              bubbles: true,
+              cancelable: true
+            });
+            this.onMouseClick(mouseEvent);
+            
+          } else {
+            // Single tap - delay to check for double tap
+            touchTimeout = setTimeout(() => {
+              const mouseEvent = new MouseEvent('click', {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                bubbles: true,
+                cancelable: true
+              });
+              this.onAsteroidClick(mouseEvent);
+              touchTimeout = null;
+            }, 250);
+          }
+          
+          lastTouchEnd = now;
+        }
+      }
+    }, { passive: false });
+
+    // Add pinch-to-zoom prevention (optional, since Three.js handles camera controls)
+    renderer.domElement.addEventListener('gesturestart', (event) => {
+      event.preventDefault();
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('gesturechange', (event) => {
+      event.preventDefault();
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('gestureend', (event) => {
+      event.preventDefault();
+    }, { passive: false });
+  },
+
   updateSelectedAsteroidInfo(asteroid) {
     if (!asteroid.userData || !this.selectedAsteroidInfo) return
     
@@ -1269,18 +1391,48 @@ let app = {
       // Convert km to meters and clamp to valid range
       const sizeInMeters = Math.min(Math.max(properties.size_km * 1000, 1), 5000)
       params.asteroidSize = sizeInMeters
+      
+      // Update control panel diameter input (asteroid-diameter expects meters)
+      const diameterInput = document.getElementById('asteroid-diameter')
+      if (diameterInput) {
+        diameterInput.value = sizeInMeters
+      }
     }
     
     if (typeof properties.speed_km_s === 'number') {
-      // Clamp speed to valid range
+      // Clamp speed to valid range (dat.GUI expects km/s)
       const speedInKmPerS = Math.min(Math.max(properties.speed_km_s, 1), 100)
       params.asteroidSpeed = speedInKmPerS
+      
+      // Update control panel speed input (asteroid-speed expects m/s)
+      const speedInput = document.getElementById('asteroid-speed')
+      if (speedInput) {
+        const speedInMPerS = speedInKmPerS * 1000 // Convert km/s to m/s
+        speedInput.value = speedInMPerS
+      }
     }
     
     // Update the GUI display to reflect the new values
     if (window.gui) {
       window.gui.updateDisplay()
     }
+    
+    // Trigger change events for control panel inputs to ensure proper synchronization
+    const diameterInput = document.getElementById('asteroid-diameter')
+    const speedInput = document.getElementById('asteroid-speed')
+    if (diameterInput) {
+      diameterInput.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    if (speedInput) {
+      speedInput.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+
+    console.log(`✅ Updated UI parameters for asteroid: ${name}`, {
+      diameter_m: diameterInput ? diameterInput.value : 'N/A',
+      speed_ms: speedInput ? speedInput.value : 'N/A',
+      datGUI_size: params.asteroidSize,
+      datGUI_speed: params.asteroidSpeed
+    })
 
     console.log(`Selected asteroid: ${name}`, {
       size: this.selectedAsteroidInfo.size,
@@ -1411,6 +1563,38 @@ let app = {
     geometry.computeVertexNormals() // Recalculate normals after deformation
   },
 
+  // Launch asteroid to specific coordinates with custom parameters
+  launchAsteroidToCoordinates(lat, lon, diameter, speed, density, angle) {
+    // Convert lat/lon to world position on Earth surface
+    const worldPosition = latLonToVector3(lat, lon, 10.02); // Slightly above Earth surface
+    
+    // Convert world coordinates to local coordinates relative to the group
+    const localPosition = this.group.worldToLocal(worldPosition.clone());
+    
+    // Temporarily store current params
+    const originalSize = params.asteroidSize;
+    const originalSpeed = params.asteroidSpeed;
+    
+    // Add custom parameters to params object
+    params.asteroidSize = diameter;
+    params.asteroidSpeed = speed / 1000; // Convert m/s to km/s for consistency
+    params.customDensity = density;
+    params.customAngle = angle;
+    params.usingCustomParams = true;
+    
+    // Use the existing asteroid launch system
+    this.launchAsteroid(localPosition);
+    
+    // Restore original params
+    params.asteroidSize = originalSize;
+    params.asteroidSpeed = originalSpeed;
+    delete params.customDensity;
+    delete params.customAngle;
+    delete params.usingCustomParams;
+    
+    console.log(`Asteroid launched to ${lat.toFixed(4)}, ${lon.toFixed(4)} with ${diameter}m diameter at ${speed}m/s`);
+  },
+
   createImpactCrater(impactPosition, realSizeMeters, speed = params.asteroidSpeed) {
     // Calculate impact zones using the imported physics model
     this.calculateAndVisualizeImpactZones(impactPosition, realSizeMeters, speed * 1000); // Convert km/s to m/s
@@ -1421,13 +1605,13 @@ let app = {
 
 
   calculateAndVisualizeImpactZones(impactPosition, asteroidDiameter_m, speed_ms) {
-    // Use realistic material densities and impact angles
+    // Use custom parameters if they were set, otherwise use defaults
     const impactParams = {
       L0_m: asteroidDiameter_m,
-      rho_i: 3100,      // kg/m³ (typical stony asteroid density)
+      rho_i: params.usingCustomParams ? params.customDensity : 3100,      // kg/m³ (custom or typical stony asteroid density)
       rho_t: 2500,      // kg/m³ (typical sedimentary rock density)
       v_ms: speed_ms,
-      gamma_deg: 45,    // 45° impact angle
+      gamma_deg: params.usingCustomParams ? params.customAngle : 45,    // Custom or 45° impact angle
       luminousEfficiency: 1e-3  // typical luminous efficiency
     };
 
@@ -1435,6 +1619,12 @@ let app = {
     const zones = ImpactZones.computeAll(impactParams);
     
     console.log('Impact zones calculated:', zones);
+    if (params.usingCustomParams) {
+      console.log('Using custom parameters:', { 
+        density: params.customDensity, 
+        angle: params.customAngle 
+      });
+    }
     
     // Convert world coordinates to lat/lon for zone calculation
     const impactCoords = vector3ToLatLon(impactPosition);

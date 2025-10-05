@@ -1,5 +1,5 @@
 {
-  "title": "Three.js Earth - Interaktiver 3D-Globus",
+  "title": "Asteroid Atlas",
   "loading": {
      "overpressure_zone": "Druckwelle (0.5 kPa / 0.07 psi)",
     "wind_zone": "Windstoß (10 m/s / 22 mph)", "progress": "Erde wird geladen..."
@@ -19,7 +19,7 @@
   "locations": {
     "london": "London",
     "tokyo": "Tokio",
-    "sydney": "Sydney",
+    "washington": "Washington",
     "new_york": "New York",
     "paris": "Paris",
     "rio_de_janeiro": "Rio de Janeiro",

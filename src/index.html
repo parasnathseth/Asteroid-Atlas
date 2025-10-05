@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, shrink-to-fit=0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
-    <title data-i18n="title">Threejs Earth</title>
+    <title data-i18n="title">Asteroid Atlas</title>
     <style>
       html,
       body {
@@ -11,11 +11,20 @@
         height: 100%;
         margin: 0;
         position: relative;
+        /* Mobile performance optimizations */
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        overscroll-behavior: none;
       }
       #container {
         width: 100%;
         height: 100%;
         display: block;
+        /* GPU acceleration for better mobile performance */
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
       }
       #veil {
         position: absolute;
@@ -48,6 +57,30 @@
         /* transform: translateX(-50%); */
         background-color: #848484;
       }
+      
+      /* Logo Styles */
+      #loading-logo {
+        position: absolute;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+      }
+      #logo-loading {
+        max-width: 200px;
+        height: auto;
+        opacity: 0.9;
+      }
+      #header-logo {
+        margin-bottom: 10px;
+        text-align: center;
+      }
+      #logo-main {
+        max-width: 120px;
+        height: auto;
+        opacity: 0.8;
+      }
+      
       #info-icon {
         position: absolute;
         bottom: 1rem;
@@ -73,43 +106,10 @@
         margin-bottom: 0;
         padding-left: 1rem;
       }
-      #coordinate-input {
-        position: absolute;
-        bottom: 10px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 15px;
-        border-radius: 8px;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        z-index: 1000;
-      }
-      #coordinate-input input {
-        width: 80px;
-        padding: 5px;
-        margin: 0 5px;
-        border: 1px solid #555;
-        border-radius: 4px;
-        background: #333;
-        color: white;
-      }
-      #coordinate-input button {
-        padding: 5px 10px;
-        margin: 5px;
-        border: none;
-        border-radius: 4px;
-        background: #0066cc;
-        color: white;
-        cursor: pointer;
-      }
-      #coordinate-input button:hover {
-        background: #0052a3;
-      }
       #language-selector-container {
         position: absolute;
-        top: 10px;
-        right: 10px;
+        bottom: 1rem;
+        left: 1rem;
         background: rgba(0, 0, 0, 0.8);
         padding: 10px;
         border-radius: 8px;
@@ -130,7 +130,7 @@
       #impact-zones-window {
         position: absolute;
         top: 10px;
-        left: 10px;
+        right: 120px;
         width: 350px;
         background: rgba(0, 0, 0, 0.9);
         border: 2px solid #0066cc;
@@ -209,23 +209,385 @@
       .seismic-zone strong {
         color: #32CD32 !important; /* Lime green */
       }
+      #control-panel {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        width: 320px;
+        max-height: calc(100vh - 20px);
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #0066cc;
+        border-radius: 8px;
+        color: white;
+        font-family: Arial, sans-serif;
+        z-index: 1000;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0, 102, 204, 0.3);
+      }
+      #control-panel-header {
+        padding: 15px;
+        background: rgba(0, 102, 204, 0.2);
+        border-bottom: 1px solid #0066cc;
+        border-radius: 6px 6px 0 0;
+      }
+      #control-panel-header h2 {
+        margin: 0;
+        font-size: 18px;
+        color: #0066cc;
+        text-align: center;
+      }
+      #control-panel-content {
+        padding: 15px;
+      }
+      .control-section {
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .control-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+      }
+      .control-section h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        color: #0066cc;
+      }
+      .input-group {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .input-group label {
+        font-size: 13px;
+        color: #ccc;
+        flex: 1;
+      }
+      .input-group input {
+        flex: 1;
+        padding: 6px 8px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 4px;
+        color: white;
+        font-size: 13px;
+        margin-left: 10px;
+      }
+      .input-group input:focus {
+        outline: none;
+        border-color: #0066cc;
+        box-shadow: 0 0 5px rgba(0, 102, 204, 0.3);
+      }
+      .launch-button {
+        width: 100%;
+        padding: 12px;
+        background: #0066cc;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+      .launch-button:hover {
+        background: #0052a3;
+      }
+      .launch-button:active {
+        background: #003d7a;
+      }
+      #language-selector {
+        background: #333;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 4px;
+        font-size: 11px;
+      }
+
+      /* Mobile and Responsive Design */
+      
+      /* Tablet and smaller desktop screens */
+      @media screen and (max-width: 1024px) {
+        #control-panel {
+          width: 280px;
+          font-size: 14px;
+        }
+        
+        #impact-zones-window {
+          width: 300px;
+          right: 80px;
+        }
+        
+        #control-panel-header h2 {
+          font-size: 16px;
+        }
+      }
+      
+      /* Mobile landscape and small tablets */
+      @media screen and (max-width: 768px) {
+        #control-panel {
+          width: 250px;
+          max-height: calc(100vh - 40px);
+          top: 5px;
+          left: 5px;
+        }
+        
+        #impact-zones-window {
+          width: 250px;
+          right: 5px;
+          top: 5px;
+          font-size: 12px;
+        }
+        
+        #language-selector-container {
+          bottom: 0.5rem;
+          left: 0.5rem;
+          padding: 8px;
+        }
+        
+        #info-icon {
+          bottom: 0.5rem;
+          right: 0.5rem;
+        }
+        
+        .input-group {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 5px;
+        }
+        
+        .input-group label {
+          margin-bottom: 3px;
+        }
+        
+        .input-group input, .input-group button {
+          width: 100%;
+          padding: 8px;
+          font-size: 14px;
+        }
+      }
+      
+      /* Mobile portrait */
+      @media screen and (max-width: 480px) {
+        #control-panel {
+          width: calc(100vw - 20px);
+          max-width: none;
+          left: 10px;
+          right: 10px;
+          top: 10px;
+          max-height: calc(50vh - 20px);
+          font-size: 13px;
+        }
+        
+        #control-panel-header {
+          padding: 10px;
+        }
+        
+        #control-panel-header h2 {
+          font-size: 14px;
+        }
+        
+        #control-panel-content {
+          padding: 10px;
+        }
+        
+        .control-section {
+          margin-bottom: 15px;
+          padding-bottom: 10px;
+        }
+        
+        .control-section h3 {
+          font-size: 13px;
+          margin-bottom: 8px;
+        }
+        
+        #impact-zones-window {
+          width: calc(100vw - 20px);
+          left: 10px;
+          right: 10px;
+          top: auto;
+          bottom: 80px;
+          max-height: calc(40vh);
+          font-size: 11px;
+        }
+        
+        #language-selector-container {
+          bottom: 10px;
+          left: 10px;
+          padding: 6px;
+        }
+        
+        #language-selector {
+          font-size: 12px;
+          padding: 6px;
+        }
+        
+        #info-icon {
+          bottom: 10px;
+          right: 10px;
+        }
+        
+        #logo-main {
+          max-width: 80px;
+        }
+        
+        #logo-loading {
+          max-width: 150px;
+        }
+        
+        /* Make touch targets larger */
+        button {
+          min-height: 44px;
+          padding: 10px 15px;
+          font-size: 14px;
+        }
+        
+        input[type="number"] {
+          min-height: 40px;
+          padding: 8px;
+          font-size: 14px;
+        }
+        
+        #language-selector {
+          min-height: 40px;
+        }
+        
+        #close-zones-window {
+          width: 30px;
+          height: 30px;
+          font-size: 18px;
+        }
+      }
+      
+      /* Very small mobile screens */
+      @media screen and (max-width: 360px) {
+        #control-panel {
+          max-height: calc(45vh - 20px);
+          font-size: 12px;
+        }
+        
+        #control-panel-header h2 {
+          font-size: 13px;
+        }
+        
+        .control-section h3 {
+          font-size: 12px;
+        }
+        
+        #impact-zones-window {
+          font-size: 10px;
+          max-height: calc(35vh);
+        }
+        
+        #logo-main {
+          max-width: 60px;
+        }
+        
+        #logo-loading {
+          max-width: 120px;
+        }
+      }
+      
+      /* Touch device optimizations */
+      @media (hover: none) and (pointer: coarse) {
+        /* Larger touch targets for all interactive elements */
+        button, select, input {
+          min-height: 44px;
+          padding: 10px;
+        }
+        
+        #language-selector option {
+          padding: 10px;
+        }
+        
+        /* Remove hover effects on touch devices */
+        button:hover, 
+        #close-zones-window:hover {
+          background: initial;
+          transform: none;
+        }
+        
+        /* Better spacing for touch */
+        .input-group {
+          margin-bottom: 15px;
+        }
+        
+        .control-section {
+          padding-bottom: 20px;
+        }
+      }
     </style>
   </head>
   <body>
     <div id="container"></div>
     <div id="veil">
+      <div id="loading-logo">
+        <img src="assets/asteroidatlas.png" alt="Asteroid Atlas" id="logo-loading">
+      </div>
       <div id="progress-bar"><div id="progress"></div></div>
+    </div>
+    
+    <!-- Control Panel -->
+    <div id="control-panel">
+      <div id="control-panel-header">
+        <div id="header-logo">
+          <img src="assets/asteroidatlas.png" alt="Asteroid Atlas" id="logo-main">
+        </div>
+        <h2 data-i18n="ui.control_panel">Asteroid Impact Simulator</h2>
+      </div>
+      <div id="control-panel-content">
+        <!-- Target Coordinates -->
+        <div class="control-section">
+          <h3 data-i18n="ui.target_coordinates">Target Coordinates</h3>
+          <div class="input-group">
+            <label data-i18n="navigation.latitude">Latitude:</label>
+            <input type="number" id="target-lat" min="-90" max="90" step="0.0001" value="40.7128" placeholder="40.7128">
+          </div>
+          <div class="input-group">
+            <label data-i18n="navigation.longitude">Longitude:</label>
+            <input type="number" id="target-lon" min="-180" max="180" step="0.0001" value="-74.0060" placeholder="-74.0060">
+          </div>
+        </div>
+
+        <!-- Asteroid Parameters -->
+        <div class="control-section">
+          <h3 data-i18n="ui.asteroid_params">Asteroid Parameters</h3>
+          <div class="input-group">
+            <label data-i18n="ui.diameter">Diameter (m):</label>
+            <input type="number" id="asteroid-diameter" min="1" max="10000" step="1" value="50" placeholder="50">
+          </div>
+          <div class="input-group">
+            <label data-i18n="ui.speed">Speed (m/s):</label>
+            <input type="number" id="asteroid-speed" min="1000" max="100000" step="100" value="20000" placeholder="20000">
+          </div>
+          <div class="input-group">
+            <label data-i18n="ui.density">Density (kg/m³):</label>
+            <input type="number" id="asteroid-density" min="500" max="10000" step="50" value="3100" placeholder="3100">
+          </div>
+          <div class="input-group">
+            <label data-i18n="ui.angle">Impact Angle (°):</label>
+            <input type="number" id="impact-angle" min="1" max="90" step="1" value="45" placeholder="45">
+          </div>
+        </div>
+
+        <!-- Launch Button -->
+        <div class="control-section">
+          <button id="launch-asteroid" class="launch-button" data-i18n="ui.launch_asteroid">Launch Asteroid</button>
+        </div>
+      </div>
     </div>
     
     <!-- Language Selector -->
     <div id="language-selector-container">
-      <label for="language-selector" data-i18n="ui.language" style="color: white; font-size: 12px; margin-right: 5px;">Language:</label>
       <select id="language-selector" onchange="changeLanguage(this.value)">
         <option value="en">English</option>
         <option value="es">Español</option>
         <option value="fr">Français</option>
         <option value="de">Deutsch</option>
         <option value="zh">中文</option>
+        <option value="ru">Русский</option>
       </select>
     </div>
     
@@ -259,31 +621,6 @@
       </div>
     </div>
     
-    <!-- Coordinate Input Interface -->
-    <div id="coordinate-input">
-      <h4 style="margin: 0 0 10px 0;" data-i18n="navigation.title">Navigate to Coordinates</h4>
-      <div>
-        <label data-i18n="navigation.latitude">Lat:</label>
-        <input type="number" id="lat-input" min="-90" max="90" step="0.0001" value="40.7128" data-i18n="navigation.latitude_placeholder" placeholder="Latitude">
-        <label data-i18n="navigation.longitude">Lon:</label>
-        <input type="number" id="lon-input" min="-180" max="180" step="0.0001" value="-74.0060" data-i18n="navigation.longitude_placeholder" placeholder="Longitude">
-      </div>
-      <div style="margin-top: 10px;">
-        <button onclick="goToInputCoordinates()" data-i18n="navigation.go_to_location">Go to Location</button>
-        <button onclick="addMarkerAtInput()" data-i18n="navigation.add_marker">Add Marker</button>
-        <button onclick="goToMyCurrentLocation()" style="background: #ff6600;" data-i18n="navigation.my_location">📍 My Location</button>
-      </div>
-      <div style="margin-top: 10px; font-size: 12px;">
-        <strong data-i18n="navigation.quick_locations">Quick Locations:</strong><br>
-        <button onclick="setCoordinates(51.5074, -0.1278)" data-i18n="locations.london">London</button>
-        <button onclick="setCoordinates(35.6762, 139.6503)" data-i18n="locations.tokyo">Tokyo</button>
-        <button onclick="setCoordinates(-33.8688, 151.2093)" data-i18n="locations.sydney">Sydney</button>
-      </div>
-      <div style="margin-top: 10px; font-size: 11px; color: #ccc;" data-i18n="navigation.click_instruction">
-        Click on Earth to get coordinates at that point
-      </div>
-    </div>
-    
     <script src="./i18n.js" type="module"></script>
     <script src="./index.js" type="module"></script>
     <script>
@@ -309,7 +646,7 @@
         if (buttons.length >= 3) {
           buttons[0].textContent = window.i18n.translateLocation('London');
           buttons[1].textContent = window.i18n.translateLocation('Tokyo');  
-          buttons[2].textContent = window.i18n.translateLocation('Sydney');
+          buttons[2].textContent = window.i18n.translateLocation('Washington');
         }
       }
 
@@ -362,7 +699,55 @@
         if (closeButton) {
           closeButton.addEventListener('click', hideImpactZonesWindow);
         }
+
+        // Add event listener for launch button
+        const launchButton = document.getElementById('launch-asteroid');
+        if (launchButton) {
+          launchButton.addEventListener('click', launchAsteroidFromPanel);
+        }
       });
+
+      // Launch asteroid function
+      function launchAsteroidFromPanel() {
+        const lat = parseFloat(document.getElementById('target-lat').value);
+        const lon = parseFloat(document.getElementById('target-lon').value);
+        const diameter = parseFloat(document.getElementById('asteroid-diameter').value);
+        const speed = parseFloat(document.getElementById('asteroid-speed').value);
+        const density = parseFloat(document.getElementById('asteroid-density').value);
+        const angle = parseFloat(document.getElementById('impact-angle').value);
+
+        // Validate inputs
+        if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+          alert('Please enter valid coordinates (Lat: -90 to 90, Lon: -180 to 180)');
+          return;
+        }
+        if (isNaN(diameter) || diameter < 1 || diameter > 10000) {
+          alert('Please enter valid diameter (1-10000 meters)');
+          return;
+        }
+        if (isNaN(speed) || speed < 1000 || speed > 100000) {
+          alert('Please enter valid speed (1000-100000 m/s)');
+          return;
+        }
+        if (isNaN(density) || density < 500 || density > 10000) {
+          alert('Please enter valid density (500-10000 kg/m³)');
+          return;
+        }
+        if (isNaN(angle) || angle < 1 || angle > 90) {
+          alert('Please enter valid impact angle (1-90°)');
+          return;
+        }
+
+        // Convert lat/lon to world position and launch asteroid
+        if (window.appInstance && window.appInstance.launchAsteroidToCoordinates) {
+          window.appInstance.launchAsteroidToCoordinates(lat, lon, diameter, speed, density, angle);
+        } else {
+          alert('Application not ready. Please wait for the Earth to fully load.');
+        }
+      }
+
+      // Make launch function available globally
+      window.launchAsteroidFromPanel = launchAsteroidFromPanel;
     </script>
   </body>
 </html>

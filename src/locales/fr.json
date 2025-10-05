@@ -1,5 +1,5 @@
 {
-  "title": "Three.js Earth - Globe 3D Interactif",
+  "title": "Asteroid Atlas",
   "loading": {
     "progress": "Chargement de la Terre..."
   },
@@ -18,7 +18,7 @@
   "locations": {
     "london": "Londres",
     "tokyo": "Tokyo",
-    "sydney": "Sydney",
+    "washington": "Washington",
     "new_york": "New York",
     "paris": "Paris",
     "rio_de_janeiro": "Rio de Janeiro",

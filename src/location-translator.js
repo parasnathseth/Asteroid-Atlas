@@ -356,7 +356,7 @@ export const CITY_MAPPINGS = {
   'Port Elizabeth': 'port_elizabeth',
   'Bloemfontein': 'bloemfontein',
   
-  'Sydney': 'sydney',
+  'Washington': 'washington',
   'Melbourne': 'melbourne',
   'Brisbane': 'brisbane',
   'Perth': 'perth',

@@ -38,7 +38,7 @@ export function createDebugCoordinateGrid(scene) {
     { lat: 51.4779, lon: 0.0015, name: "Greenwich", color: 0xffffff }, // Prime Meridian
     { lat: 0, lon: 0, name: "Null Island", color: 0x888888 }, // Equator + Prime Meridian
     { lat: 40.7128, lon: -74.0060, name: "NYC", color: 0xff4444 }, // Should be over North America
-    { lat: -33.8688, lon: 151.2093, name: "Sydney", color: 0x44ff44 }, // Should be over Australia
+    { lat: 38.9072, lon: -77.0369, name: "Washington", color: 0x44ff44 }, // Should be over USA
     { lat: 35.6762, lon: 139.6503, name: "Tokyo", color: 0x4444ff }, // Should be over Japan
   ]
   
@@ -61,7 +61,7 @@ export function testCoordinateMapping() {
   // Test known locations
   const testPoints = [
     { name: "New York City", lat: 40.7128, lon: -74.0060 },
-    { name: "Sydney", lat: -33.8688, lon: 151.2093 },
+    { name: "Washington", lat: 38.9072, lon: -77.0369 },
     { name: "London", lat: 51.5074, lon: -0.1278 },
     { name: "Tokyo", lat: 35.6762, lon: 139.6503 }
   ]
