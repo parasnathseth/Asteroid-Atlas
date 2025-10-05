@@ -847,11 +847,6 @@ let app = {
       `
     }
     
-    // Calculate distance to target location
-    const distance = calculateDistance(lat, lon, params.targetLat, params.targetLon)
-    this.locationInfoDiv.innerHTML = `
-      <strong>${i18n.t('coordinates.distance_to_target')}:</strong> ${distance.toFixed(0)} ${i18n.t('measurements.kilometers')}
-    `
   },
 
   // Update control panel coordinates when clicking on Earth
