@@ -105,6 +105,8 @@ let app = {
     // OrbitControls
     this.controls = new OrbitControls(camera, renderer.domElement)
     this.controls.enableDamping = true
+    this.controls.minDistance = 13 // Minimum zoom distance (prevent going inside Earth)
+    this.controls.maxDistance = 200 // Maximum zoom distance (prevent going too far out)
     
     // Array to store all dots placed on the sphere
     this.dots = []
@@ -231,12 +233,6 @@ let app = {
     // Load and create asteroid orbital paths
     await this.createOrbitalPaths()
 
-    // meshphysical.glsl.js is the shader used by MeshStandardMaterial: https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderLib/meshphysical.glsl.js
-    // shadowing of clouds, from https://discourse.threejs.org/t/how-to-cast-shadows-from-an-outer-sphere-to-an-inner-sphere/53732/6
-    // some notes of the negative light map done on the earth material to simulate shadows casted by clouds
-    // we need uv_xOffset so as to act as a means to calibrate the offset of the clouds shadows on earth(especially when earth and cloud rotate at different speeds)
-    // the way I need to use fracts here is to get a correct calculated result of the cloud texture offset as it moves,
-    // arrived at current method by doing the enumeration of cases (writing them down truly helps, don't keep everything in your head!)
     earthMat.onBeforeCompile = function( shader ) {
       shader.uniforms.tClouds = { value: cloudsMap }
       shader.uniforms.tClouds.value.wrapS = THREE.RepeatWrapping;
@@ -1040,21 +1036,13 @@ let app = {
 
   async createOrbitalPaths() {
     console.log('Starting to create orbital paths using imported data...');
-    try {
-      // Use the imported asteroid data directly
-      const asteroidData = asteroidOrbitData;
-      console.log('Using imported asteroid data:', Object.keys(asteroidData).length, 'asteroids');
+    // Use the imported asteroid data directly
+    const asteroidData = asteroidOrbitData;
+    console.log('Using imported asteroid data:', Object.keys(asteroidData).length, 'asteroids');
+    
+    // Process the imported data
+    this.processAsteroidData(asteroidData);
       
-      // Process the imported data
-      this.processAsteroidData(asteroidData);
-      
-    } catch (importError) {
-      console.warn('Could not use imported asteroid data:', importError);
-      console.log('Creating fallback orbital paths...');
-      
-      // Create some fallback orbital paths if import fails
-      this.createFallbackOrbits();
-    }
   },
 
   processAsteroidData(asteroidData) {
@@ -1224,12 +1212,6 @@ let app = {
       this.group.add(orbitTube);
       this.orbitalPaths.push(orbitTube);
       
-      // Add all the spheres
-      spheres.forEach(sphere => {
-        this.group.add(sphere);
-        this.orbitalPaths.push(sphere);
-      });
-      
       // Create a larger moving asteroid on this orbit using interpolated points
       this.createOrbitingAsteroid(finalPathPoints, colors[colorIndex % colors.length], asteroidName);
       
@@ -1245,130 +1227,6 @@ let app = {
     console.log('Orbital paths should now be visible around Earth with neon colors');
     console.log('Use mouse to orbit around and zoom in/out to find the orbital paths');
     console.log('================================\n');
-  },
-
-  createFallbackOrbits() {
-    console.log('Creating fallback orbital paths...');
-    
-    const colors = [0x00ff00, 0xff0080, 0x00ffff, 0xffff00, 0xff4000];
-    
-    for (let i = 0; i < 5; i++) {
-      const radius = 20 + i * 8;
-      const points = [];
-      const numPoints = 60;
-      
-      for (let j = 0; j < numPoints; j++) {
-        const angle = (j / numPoints) * Math.PI * 2;
-        // Create elliptical orbits with different inclinations
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius * (0.7 + i * 0.1);
-        const z = Math.sin(angle + i) * (5 + i * 3);
-        points.push(new THREE.Vector3(x, y, z));
-      }
-      
-      // Create orbital path
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const material = new THREE.LineBasicMaterial({
-        color: colors[i],
-        transparent: true,
-        opacity: 1.0,
-        linewidth: 12
-      });
-      
-      const line = new THREE.Line(geometry, material);
-      line.userData = {
-        asteroidName: `FallbackOrbit${i + 1}`,
-        isFallbackOrbit: true
-      };
-      console.log(`Adding fallback orbit ${i + 1}`);
-      this.group.add(line);
-      this.orbitalPaths.push(line);
-      
-      // Add a moving asteroid
-      const asteroid = new THREE.Mesh(
-        new THREE.SphereGeometry(0.6, 8, 8),
-        new THREE.MeshStandardMaterial({
-          color: colors[i],
-          emissive: colors[i],
-          emissiveIntensity: 0.4
-        })
-      );
-      asteroid.position.copy(points[0]);
-      asteroid.userData = {
-        pathPoints: points,
-        currentIndex: 0,
-        speed: 0.3 + i * 0.1,
-        name: `FallbackAsteroid${i + 1}`,
-        rotationSpeed: {
-          x: (Math.random() - 0.5) * 0.02,
-          y: (Math.random() - 0.5) * 0.02,
-          z: (Math.random() - 0.5) * 0.02
-        }
-      };
-      this.group.add(asteroid);
-      this.orbitalPaths.push(asteroid);
-    }
-    
-    console.log('Fallback orbits created successfully');
-  },
-
-  createTestOrbit(color) {
-    console.log('Creating simple test orbit...');
-    
-    // Create a simple circular orbit around Earth
-    const testPoints = [];
-    const radius = 25; // Distance from Earth center
-    const numPoints = 50;
-    
-    for (let i = 0; i < numPoints; i++) {
-      const angle = (i / numPoints) * Math.PI * 2;
-      const x = Math.cos(angle) * radius;
-      const y = Math.sin(angle) * radius;
-      const z = Math.sin(angle * 2) * 5; // Add some vertical variation
-      testPoints.push(new THREE.Vector3(x, y, z));
-    }
-    
-    // Create the test orbital path
-    const testGeometry = new THREE.BufferGeometry().setFromPoints(testPoints);
-    const testMaterial = new THREE.LineBasicMaterial({ 
-      color: color,
-      transparent: true,
-      opacity: 1.0,
-      linewidth: 15
-    });
-    
-    const testLine = new THREE.Line(testGeometry, testMaterial);
-    testLine.userData = {
-      asteroidName: 'TestOrbit',
-      isTestOrbit: true
-    };
-    console.log('Adding test orbit to scene');
-    this.group.add(testLine);
-    this.orbitalPaths.push(testLine);
-    
-    // Create a test asteroid
-    const testAsteroid = new THREE.Mesh(
-      new THREE.SphereGeometry(0.8, 8, 8),
-      new THREE.MeshStandardMaterial({
-        color: color,
-        emissive: color,
-        emissiveIntensity: 0.3
-      })
-    );
-    testAsteroid.position.copy(testPoints[0]);
-    testAsteroid.userData = {
-      pathPoints: testPoints,
-      currentIndex: 0,
-      speed: 0.5,
-      name: 'TestAsteroid',
-      rotationSpeed: {
-        x: 0.01,
-        y: 0.02,
-        z: 0.01
-      }
-    };
-    this.group.add(testAsteroid);
-    this.orbitalPaths.push(testAsteroid);
   },
 
   createOrbitingAsteroid(pathPoints, color, name) {
@@ -1529,14 +1387,6 @@ let app = {
   }
 }
 
-/**************************************************
- * 3. Run the app
- * 'runApp' will do most of the boilerplate setup code for you:
- * e.g. HTML container, window resize listener, mouse move/touch listener for shader uniforms, THREE.Clock() for animation
- * Executing this line puts everything together and runs the app
- * ps. if you don't use custom shaders, pass undefined to the 'uniforms'(2nd-last) param
- * ps. if you don't use post-processing, pass undefined to the 'composer'(last) param
- *************************************************/
 runApp(app, scene, renderer, camera, true, undefined, undefined)
 
 // Store app reference globally for HTML interface
