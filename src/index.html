@@ -48,6 +48,30 @@
         /* transform: translateX(-50%); */
         background-color: #848484;
       }
+      
+      /* Logo Styles */
+      #loading-logo {
+        position: absolute;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+      }
+      #logo-loading {
+        max-width: 200px;
+        height: auto;
+        opacity: 0.9;
+      }
+      #header-logo {
+        margin-bottom: 10px;
+        text-align: center;
+      }
+      #logo-main {
+        max-width: 120px;
+        height: auto;
+        opacity: 0.8;
+      }
+      
       #info-icon {
         position: absolute;
         bottom: 1rem;
@@ -286,12 +310,18 @@
   <body>
     <div id="container"></div>
     <div id="veil">
+      <div id="loading-logo">
+        <img src="assets/asteroidatlas.png" alt="Asteroid Atlas" id="logo-loading">
+      </div>
       <div id="progress-bar"><div id="progress"></div></div>
     </div>
     
     <!-- Control Panel -->
     <div id="control-panel">
       <div id="control-panel-header">
+        <div id="header-logo">
+          <img src="assets/asteroidatlas.png" alt="Asteroid Atlas" id="logo-main">
+        </div>
         <h2 data-i18n="ui.control_panel">Asteroid Impact Simulator</h2>
       </div>
       <div id="control-panel-content">
