@@ -4,7 +4,7 @@
   # Asteroid Atlas - 3D Earth Impact Simulation
 </div>
 
-An interactive 3D asteroid orbit and Earth impact simulation using [Three.js](https://threejs.org/). This project allows users to select real asteroids pulled from NASA NEO API and see their devastating effects on Earth. Designed for educational and scientific outreach, it features a mobile-friendly UI and accessibility options.
+An interactive 3D asteroid orbit and Earth impact simulation using [Three.js](https://threejs.org/). This project allows users to select real asteroids pulled from NASA NEO API displayed by their position in NASA SBDB APIand see their devastating effects on Earth. Designed for educational and scientific outreach, it features a mobile-friendly UI and accessibility options.
 
 ## Features
 
