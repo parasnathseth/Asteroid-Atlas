@@ -1258,16 +1258,38 @@ let app = {
       console.log('Available asteroids in properties file:', Object.keys(asterooidSizeandSpeedData || {}))
     }
     
-    // Update the GUI display
+    // Update the GUI display for selected asteroid info
     this.selectedAsteroidInfo.name = name
     this.selectedAsteroidInfo.size = properties.size_km || 'Unknown'
     this.selectedAsteroidInfo.speed = properties.speed_km_s || 'Unknown'
     this.selectedAsteroidInfo.composition = properties.composition || 'Unknown'
+
+    // Update the asteroid impact parameters if values are valid numbers
+    if (typeof properties.size_km === 'number') {
+      // Convert km to meters and clamp to valid range
+      const sizeInMeters = Math.min(Math.max(properties.size_km * 1000, 1), 5000)
+      params.asteroidSize = sizeInMeters
+    }
     
+    if (typeof properties.speed_km_s === 'number') {
+      // Clamp speed to valid range
+      const speedInKmPerS = Math.min(Math.max(properties.speed_km_s, 1), 100)
+      params.asteroidSpeed = speedInKmPerS
+    }
+    
+    // Update the GUI display to reflect the new values
+    if (window.gui) {
+      window.gui.updateDisplay()
+    }
+
     console.log(`Selected asteroid: ${name}`, {
       size: this.selectedAsteroidInfo.size,
       speed: this.selectedAsteroidInfo.speed,
-      composition: this.selectedAsteroidInfo.composition
+      composition: this.selectedAsteroidInfo.composition,
+      updatedParams: {
+        asteroidSize: params.asteroidSize,
+        asteroidSpeed: params.asteroidSpeed
+      }
     })
   },
 
