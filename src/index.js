@@ -242,6 +242,9 @@ let app = {
     // Add single click event listener for asteroid selection
     renderer.domElement.addEventListener('click', (event) => this.onAsteroidClick(event))
 
+    // Add touch event support for mobile devices
+    this.addTouchSupport(renderer)
+
     // Load and create asteroid orbital paths
     await this.createOrbitalPaths()
 
@@ -1264,6 +1267,95 @@ let app = {
       userData.outerGlowSphere.material.color.setHex(originalColor)
       userData.outerGlowSphere.material.opacity = originalOpacity * 0.3
     }
+  },
+
+  // Add touch support for mobile devices
+  addTouchSupport(renderer) {
+    let touchStartTime = 0;
+    let touchStartPosition = { x: 0, y: 0 };
+    let lastTouchEnd = 0;
+    let touchTimeout = null;
+
+    // Prevent default touch behaviors to avoid scrolling issues
+    renderer.domElement.addEventListener('touchstart', (event) => {
+      event.preventDefault();
+      touchStartTime = Date.now();
+      
+      if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        touchStartPosition.x = touch.clientX;
+        touchStartPosition.y = touch.clientY;
+      }
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchmove', (event) => {
+      event.preventDefault();
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchend', (event) => {
+      event.preventDefault();
+      
+      if (event.changedTouches.length === 1) {
+        const touch = event.changedTouches[0];
+        const touchEndTime = Date.now();
+        const touchDuration = touchEndTime - touchStartTime;
+        const touchDistance = Math.sqrt(
+          Math.pow(touch.clientX - touchStartPosition.x, 2) + 
+          Math.pow(touch.clientY - touchStartPosition.y, 2)
+        );
+        
+        // Consider it a tap if touch duration is short and minimal movement
+        if (touchDuration < 500 && touchDistance < 30) {
+          const now = touchEndTime;
+          
+          // Double tap detection (within 300ms)
+          if (now - lastTouchEnd < 300) {
+            // Clear any pending single tap
+            if (touchTimeout) {
+              clearTimeout(touchTimeout);
+              touchTimeout = null;
+            }
+            
+            // Trigger double tap (asteroid impact)
+            const mouseEvent = new MouseEvent('dblclick', {
+              clientX: touch.clientX,
+              clientY: touch.clientY,
+              bubbles: true,
+              cancelable: true
+            });
+            this.onMouseClick(mouseEvent);
+            
+          } else {
+            // Single tap - delay to check for double tap
+            touchTimeout = setTimeout(() => {
+              const mouseEvent = new MouseEvent('click', {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                bubbles: true,
+                cancelable: true
+              });
+              this.onAsteroidClick(mouseEvent);
+              touchTimeout = null;
+            }, 250);
+          }
+          
+          lastTouchEnd = now;
+        }
+      }
+    }, { passive: false });
+
+    // Add pinch-to-zoom prevention (optional, since Three.js handles camera controls)
+    renderer.domElement.addEventListener('gesturestart', (event) => {
+      event.preventDefault();
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('gesturechange', (event) => {
+      event.preventDefault();
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('gestureend', (event) => {
+      event.preventDefault();
+    }, { passive: false });
   },
 
   updateSelectedAsteroidInfo(asteroid) {

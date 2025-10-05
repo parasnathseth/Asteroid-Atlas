@@ -11,11 +11,20 @@
         height: 100%;
         margin: 0;
         position: relative;
+        /* Mobile performance optimizations */
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        overscroll-behavior: none;
       }
       #container {
         width: 100%;
         height: 100%;
         display: block;
+        /* GPU acceleration for better mobile performance */
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
       }
       #veil {
         position: absolute;
@@ -296,6 +305,219 @@
         padding: 4px;
         font-size: 11px;
       }
+
+      /* Mobile and Responsive Design */
+      
+      /* Tablet and smaller desktop screens */
+      @media screen and (max-width: 1024px) {
+        #control-panel {
+          width: 280px;
+          font-size: 14px;
+        }
+        
+        #impact-zones-window {
+          width: 300px;
+          right: 80px;
+        }
+        
+        #control-panel-header h2 {
+          font-size: 16px;
+        }
+      }
+      
+      /* Mobile landscape and small tablets */
+      @media screen and (max-width: 768px) {
+        #control-panel {
+          width: 250px;
+          max-height: calc(100vh - 40px);
+          top: 5px;
+          left: 5px;
+        }
+        
+        #impact-zones-window {
+          width: 250px;
+          right: 5px;
+          top: 5px;
+          font-size: 12px;
+        }
+        
+        #language-selector-container {
+          bottom: 0.5rem;
+          left: 0.5rem;
+          padding: 8px;
+        }
+        
+        #info-icon {
+          bottom: 0.5rem;
+          right: 0.5rem;
+        }
+        
+        .input-group {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 5px;
+        }
+        
+        .input-group label {
+          margin-bottom: 3px;
+        }
+        
+        .input-group input, .input-group button {
+          width: 100%;
+          padding: 8px;
+          font-size: 14px;
+        }
+      }
+      
+      /* Mobile portrait */
+      @media screen and (max-width: 480px) {
+        #control-panel {
+          width: calc(100vw - 20px);
+          max-width: none;
+          left: 10px;
+          right: 10px;
+          top: 10px;
+          max-height: calc(50vh - 20px);
+          font-size: 13px;
+        }
+        
+        #control-panel-header {
+          padding: 10px;
+        }
+        
+        #control-panel-header h2 {
+          font-size: 14px;
+        }
+        
+        #control-panel-content {
+          padding: 10px;
+        }
+        
+        .control-section {
+          margin-bottom: 15px;
+          padding-bottom: 10px;
+        }
+        
+        .control-section h3 {
+          font-size: 13px;
+          margin-bottom: 8px;
+        }
+        
+        #impact-zones-window {
+          width: calc(100vw - 20px);
+          left: 10px;
+          right: 10px;
+          top: auto;
+          bottom: 80px;
+          max-height: calc(40vh);
+          font-size: 11px;
+        }
+        
+        #language-selector-container {
+          bottom: 10px;
+          left: 10px;
+          padding: 6px;
+        }
+        
+        #language-selector {
+          font-size: 12px;
+          padding: 6px;
+        }
+        
+        #info-icon {
+          bottom: 10px;
+          right: 10px;
+        }
+        
+        #logo-main {
+          max-width: 80px;
+        }
+        
+        #logo-loading {
+          max-width: 150px;
+        }
+        
+        /* Make touch targets larger */
+        button {
+          min-height: 44px;
+          padding: 10px 15px;
+          font-size: 14px;
+        }
+        
+        input[type="number"] {
+          min-height: 40px;
+          padding: 8px;
+          font-size: 14px;
+        }
+        
+        #language-selector {
+          min-height: 40px;
+        }
+        
+        #close-zones-window {
+          width: 30px;
+          height: 30px;
+          font-size: 18px;
+        }
+      }
+      
+      /* Very small mobile screens */
+      @media screen and (max-width: 360px) {
+        #control-panel {
+          max-height: calc(45vh - 20px);
+          font-size: 12px;
+        }
+        
+        #control-panel-header h2 {
+          font-size: 13px;
+        }
+        
+        .control-section h3 {
+          font-size: 12px;
+        }
+        
+        #impact-zones-window {
+          font-size: 10px;
+          max-height: calc(35vh);
+        }
+        
+        #logo-main {
+          max-width: 60px;
+        }
+        
+        #logo-loading {
+          max-width: 120px;
+        }
+      }
+      
+      /* Touch device optimizations */
+      @media (hover: none) and (pointer: coarse) {
+        /* Larger touch targets for all interactive elements */
+        button, select, input {
+          min-height: 44px;
+          padding: 10px;
+        }
+        
+        #language-selector option {
+          padding: 10px;
+        }
+        
+        /* Remove hover effects on touch devices */
+        button:hover, 
+        #close-zones-window:hover {
+          background: initial;
+          transform: none;
+        }
+        
+        /* Better spacing for touch */
+        .input-group {
+          margin-bottom: 15px;
+        }
+        
+        .control-section {
+          padding-bottom: 20px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -365,6 +587,7 @@
         <option value="fr">Français</option>
         <option value="de">Deutsch</option>
         <option value="zh">中文</option>
+        <option value="ru">Русский</option>
       </select>
     </div>
     
