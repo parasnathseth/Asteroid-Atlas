@@ -113,7 +113,7 @@ let app = {
     // OrbitControls
     this.controls = new OrbitControls(camera, renderer.domElement)
     this.controls.enableDamping = true
-    this.controls.minDistance = 13 // Minimum zoom distance (prevent going inside Earth)
+    this.controls.minDistance = 12 // Minimum zoom distance (prevent going inside Earth)
     this.controls.maxDistance = 200 // Maximum zoom distance (prevent going too far out)
     
     // Array to store all dots placed on the sphere
@@ -1498,7 +1498,7 @@ let app = {
   createImpactFlash(impactPosition, asteroidSize = 100, speed = 10) {
     // Create a bright flash at impact point, scale with asteroid size and speed
     const baseScale = 0.5; // Larger base scale
-    const baseDuration = 3000; // Longer duration (3 seconds)
+    const baseDuration = 1000; // Longer duration (3 seconds)
     const scaleFactor = Math.max(1, asteroidSize / 100); // Scale based on asteroid size
     const speedFactor = Math.max(1, speed / 10); // speed in km/s, normalized
     const initialScale = baseScale * scaleFactor;
