@@ -1,6 +1,7 @@
 {
   "title": "Asteroid Atlas",
   "loading": {
+    "title": "Loading Asteroid Atlas...",
     "progress": "Loading Earth..."
   },
   "navigation": {

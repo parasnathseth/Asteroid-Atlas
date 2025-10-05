@@ -28,15 +28,28 @@
         opacity: 1;
         pointer-events: none;
         transition: opacity 1s ease-in-out;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      #loading-image {
+        max-width: 60%;
+        max-height: 60%;
+        object-fit: contain;
+        margin-bottom: 50px;
+        opacity: 0.8;
+        animation: pulse 2s ease-in-out infinite alternate;
+      }
+      @keyframes pulse {
+        from { opacity: 0.6; }
+        to { opacity: 1; }
       }
       #progress-bar {
-        position: absolute;
+        position: relative;
         width: 200px;
         height: 5px;
-        left: 50vw;
-        top: 50vh;
         transition: opacity 0.2s ease;
-        transform: translateX(-50%);
         background-color: #333;
       }
       #progress {
@@ -46,8 +59,15 @@
         left: 0px;
         top: 0px;
         transition: width 0.2s ease;
-        /* transform: translateX(-50%); */
         background-color: #848484;
+      }
+      #loading-title {
+        color: white;
+        font-family: Arial, sans-serif;
+        font-size: 24px;
+        margin-bottom: 20px;
+        text-align: center;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
       }
       #info-icon {
         position: absolute;
@@ -133,6 +153,8 @@
   <body>
     <div id="container"></div>
     <div id="veil">
+      <img id="loading-image" src="../asteroidatlas.png" alt="Asteroid Atlas" />
+      <h1 id="loading-title" data-i18n="loading.title">Loading Asteroid Atlas...</h1>
       <div id="progress-bar"><div id="progress"></div></div>
     </div>
     

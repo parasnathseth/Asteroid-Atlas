@@ -1,6 +1,7 @@
 {
   "title": "Three.js Earth - Globe 3D Interactif",
   "loading": {
+    "title": "Chargement de l'Atlas des Astéroïdes...",
     "progress": "Chargement de la Terre..."
   },
   "navigation": {

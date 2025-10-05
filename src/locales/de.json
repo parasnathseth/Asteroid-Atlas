@@ -1,6 +1,7 @@
 {
   "title": "Three.js Earth - Interaktiver 3D-Globus",
   "loading": {
+    "title": "Asteroiden-Atlas wird geladen...",
     "progress": "Erde wird geladen..."
   },
   "navigation": {

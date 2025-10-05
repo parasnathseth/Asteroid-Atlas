@@ -1,6 +1,7 @@
 {
   "title": "Three.js Earth - 交互式3D地球",
   "loading": {
+    "title": "正在加载小行星图集...",
     "progress": "正在加载地球..."
   },
   "navigation": {

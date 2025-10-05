@@ -1,6 +1,7 @@
 {
   "title": "Three.js Earth - Globo 3D Interactivo",
   "loading": {
+    "title": "Cargando Atlas de Asteroides...",
     "progress": "Cargando la Tierra..."
   },
   "navigation": {
