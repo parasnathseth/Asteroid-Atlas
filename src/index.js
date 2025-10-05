@@ -433,6 +433,9 @@ let app = {
     // Initialize coordinate info display
     this.createCoordinateInfoDisplay()
     
+    // Add info button for math explanation
+    this.createMathInfoButton()
+    
     // Add mouse interaction for clicking on Earth
     this.setupEarthInteraction()
     
@@ -464,6 +467,285 @@ let app = {
     this.container.appendChild(infoDiv)
     this.coordInfoDiv = infoDiv.querySelector('#coord-info')
     this.locationInfoDiv = infoDiv.querySelector('#location-info')
+  },
+
+  // Create math info button
+  createMathInfoButton() {
+    const infoButton = document.createElement('button')
+    infoButton.innerHTML = 'The Math'
+    infoButton.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 25px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      z-index: 2000;
+      transition: all 0.3s ease;
+    `
+    
+    // Add hover effects
+    infoButton.addEventListener('mouseenter', () => {
+      infoButton.style.transform = 'translateY(-2px)'
+      infoButton.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.4)'
+    })
+    
+    infoButton.addEventListener('mouseleave', () => {
+      infoButton.style.transform = 'translateY(0)'
+      infoButton.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)'
+    })
+    
+    // Add click functionality to show the math explanation overlay
+    infoButton.addEventListener('click', () => {
+      this.showMathExplanationOverlay()
+    })
+    
+    this.container.appendChild(infoButton)
+  },
+
+  // Create and show math explanation overlay
+  showMathExplanationOverlay() {
+    // Create overlay backdrop
+    const overlay = document.createElement('div')
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 10000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+    `
+    
+    // Create content container
+    const content = document.createElement('div')
+    content.style.cssText = `
+      background: white;
+      border-radius: 15px;
+      max-width: 900px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      position: relative;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+    `
+    
+    // Add close button
+    const closeButton = document.createElement('button')
+    closeButton.innerHTML = '✕'
+    closeButton.style.cssText = `
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    `
+    
+    closeButton.addEventListener('mouseenter', () => {
+      closeButton.style.background = '#5a67d8'
+      closeButton.style.transform = 'scale(1.1)'
+    })
+    
+    closeButton.addEventListener('mouseleave', () => {
+      closeButton.style.background = '#667eea'
+      closeButton.style.transform = 'scale(1)'
+    })
+    
+    closeButton.addEventListener('click', () => {
+      document.body.removeChild(overlay)
+    })
+    
+    // Add math explanation content
+    content.innerHTML = `
+      <h1 style="color: #4a5568; text-align: center; margin-bottom: 10px; font-size: 2.5rem;">🪐 Asteroid Impact Mortality Zone Model</h1>
+      <div style="text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 30px;">
+        <strong>Based on Rumpf (2016) <em>Asteroid Impact Risk</em></strong><br>
+        University of Southampton e-thesis — <a href="https://eprints.soton.ac.uk/412703/1/FINAL_e_thesis_for_e_prints_Rumpf_26699079.pdf" target="_blank">Rumpf, 2016</a>
+      </div>
+
+      <p>This document explains the physics and mathematical background behind the asteroid impact simulation. Each section corresponds to one of the modeled <strong>impact effects</strong>: crater formation, thermal radiation (fireball), overpressure (shockwave), wind blast, and seismic shaking (earthquake).</p>
+
+      <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">⚙️ 1. Crater Formation</h2>
+      <p><strong>Purpose:</strong> estimate the transient and final crater sizes for a ground impact.</p>
+
+      <h3 style="color: #5a67d8; margin-top: 25px;">Transient Crater Diameter</h3>
+      <p>From Rumpf Eq. (3.42), based on <strong>Collins et al. (2005)</strong> impact-scaling laws:</p>
+
+      <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
+        D<sub>tc</sub> = 1.161 (ρ<sub>i</sub>/ρ<sub>t</sub>)<sup>1/3</sup> L<sub>0</sub><sup>0.78</sup> v<sub>i</sub><sup>0.44</sup> g<sub>0</sub><sup>-0.22</sup> sin<sup>1/3</sup>γ
+      </div>
+
+      <p><strong>Where:</strong></p>
+      <ul>
+        <li>D<sub>tc</sub>: transient crater diameter (m)</li>
+        <li>ρ<sub>i</sub>: impactor density (kg/m³)</li>
+        <li>ρ<sub>t</sub>: target (ground) density (kg/m³)</li>
+        <li>L<sub>0</sub>: impactor diameter (m)</li>
+        <li>v<sub>i</sub>: impact speed (m/s)</li>
+        <li>g<sub>0</sub> = 9.81 m/s²: surface gravity</li>
+        <li>γ: impact angle (degrees from horizontal)</li>
+      </ul>
+
+      <h3 style="color: #5a67d8; margin-top: 25px;">Final Crater Diameter</h3>
+      <p>After collapse and rim formation, the final crater grows by ≈25%:</p>
+
+      <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
+        D<sub>fr</sub> = 1.25 D<sub>tc</sub>
+      </div>
+
+      <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">☀️ 2. Thermal Radiation (Fireball Zone)</h2>
+      <p><strong>Purpose:</strong> estimate the radius at which thermal radiation causes 50% mortality.</p>
+
+      <h3 style="color: #5a67d8; margin-top: 25px;">Fireball Radius</h3>
+      <p>From Rumpf Eq. (3.56):</p>
+
+      <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
+        R<sub>f</sub> = 0.002 E<sup>1/3</sup>
+      </div>
+
+      <h3 style="color: #5a67d8; margin-top: 25px;">Vulnerability (Mortality Curve)</h3>
+      <p>Thermal mortality follows a <strong>logistic (sigmoid)</strong> function (Rumpf Eq. 3.82):</p>
+
+      <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
+        V<sub>thermal</sub>(φ) = 1 / (1 + e<sup>-0.00000562327(φ - 731641.664)</sup>)
+      </div>
+
+      <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">💨 3. Overpressure (Shockwave Zone)</h2>
+      <p><strong>Purpose:</strong> determine radius where blast overpressure causes 50% mortality.</p>
+
+      <h3 style="color: #5a67d8; margin-top: 25px;">Overpressure Vulnerability</h3>
+      <p>From Rumpf Eq. (3.79), expected-case logistic fit:</p>
+
+      <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
+        V<sub>overpressure</sub>(p) = 1 / (1 + e<sup>-0.0000242498102(p - 440430.986)</sup>)
+      </div>
+
+      <p>Midpoint (50% mortality) at p<sub>50</sub> = 440,430.986 Pa (4.4 atm)</p>
+
+      <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">🌪️ 4. Wind Blast Zone</h2>
+      <p><strong>Purpose:</strong> find radius where wind speeds from the blast cause 50% mortality.</p>
+
+      <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
+        V<sub>wind</sub>(v) = 1 / (1 + e<sup>-0.05483(v - 112.4)</sup>)
+      </div>
+
+      <p>Midpoint (50% mortality): v<sub>50</sub> = 112.4 m/s</p>
+
+      <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">🌍 5. Seismic (Earthquake) Zone</h2>
+      <p><strong>Purpose:</strong> estimate the distance where seismic shaking causes 50% mortality.</p>
+
+      <h3 style="color: #5a67d8; margin-top: 25px;">Impact Energy → Global Magnitude</h3>
+      <p>Rumpf Eq. (3.45):</p>
+
+      <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
+        M = 0.67 log<sub>10</sub>(E) - 5.87
+      </div>
+
+      <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">⚖️ 6. Energy and Yield Conversions</h2>
+      <p>All these effects depend on the <strong>impact kinetic energy</strong>:</p>
+
+      <div style="text-align: center; font-size: 18px; margin: 20px 0; color: #2d3748; background: #edf2f7; padding: 15px; border-radius: 6px;">
+        E = ½mv² = (π/12) ρ<sub>i</sub> L<sub>0</sub>³ v²
+      </div>
+
+      <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">🧩 Summary of 50% Mortality Thresholds</h2>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.9rem;">
+        <thead>
+          <tr>
+            <th style="border: 1px solid #ddd; padding: 12px; background: #667eea; color: white;">Effect</th>
+            <th style="border: 1px solid #ddd; padding: 12px; background: #667eea; color: white;">Mortality Variable</th>
+            <th style="border: 1px solid #ddd; padding: 12px; background: #667eea; color: white;">50% Threshold</th>
+            <th style="border: 1px solid #ddd; padding: 12px; background: #667eea; color: white;">Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background: #f8f9fa;">
+            <td style="border: 1px solid #ddd; padding: 12px;"><strong>Crater</strong></td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Crater interior</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">100% mortality</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Eq. 3.42–3.43</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 12px;"><strong>Fireball</strong></td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Radiant exposure φ</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">731,642 J/m²</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Eq. 3.82</td>
+          </tr>
+          <tr style="background: #f8f9fa;">
+            <td style="border: 1px solid #ddd; padding: 12px;"><strong>Shockwave</strong></td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Overpressure p</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">440,431 Pa</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Eq. 3.79</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 12px;"><strong>Wind blast</strong></td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Wind speed v</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">112.4 m/s</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Eq. 3.88</td>
+          </tr>
+          <tr style="background: #f8f9fa;">
+            <td style="border: 1px solid #ddd; padding: 12px;"><strong>Seismic</strong></td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Effective magnitude M<sub>eff</sub></td>
+            <td style="border: 1px solid #ddd; padding: 12px;">8.6856</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">Eq. 3.75</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="background: #e6fffa; border-left: 4px solid #38b2ac; padding: 15px; margin: 15px 0;">
+        <p><strong>Rumpf, C.</strong> (2016). <em>Asteroid Impact Risk.</em><br>
+        University of Southampton, Faculty of Engineering and the Environment.<br>
+        <a href="https://eprints.soton.ac.uk/412703/1/FINAL_e_thesis_for_e_prints_Rumpf_26699079.pdf" target="_blank">ePrints ID 412703</a></p>
+      </div>
+
+    `
+    
+    content.appendChild(closeButton)
+    overlay.appendChild(content)
+    document.body.appendChild(overlay)
+    
+    // Close overlay when clicking outside content
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay)
+      }
+    })
+    
+    // Close overlay with Escape key
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        document.body.removeChild(overlay)
+        document.removeEventListener('keydown', handleEscape)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
   },
 
   // Setup mouse interaction for Earth clicking
