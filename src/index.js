@@ -34,6 +34,7 @@ import vertexShader from "./shaders/vertex.glsl"
 import fragmentShader from "./shaders/fragment.glsl"
 import GaiaSky from "./assets/Gaia_EDR3_darkened.png"
 import asteroidOrbitData from "./assets/asteroid_orbit_coords.json"
+import asterooidSizeandSpeedData from "./assets/asteroid_properties.json"
 
 global.THREE = THREE
 // Make i18n available globally for other modules
@@ -236,6 +237,10 @@ let app = {
     testCoordinateMapping()
     // Add mouse double-click event listener for asteroid impacts
     renderer.domElement.addEventListener('dblclick', (event) => this.onMouseClick(event))
+  
+    
+    // Add single click event listener for asteroid selection
+    renderer.domElement.addEventListener('click', (event) => this.onAsteroidClick(event))
 
     // Load and create asteroid orbital paths
     await this.createOrbitalPaths()
@@ -381,6 +386,23 @@ let app = {
     const asteroidFolder = gui.addFolder('Asteroid Impact')
     asteroidFolder.add(params, 'asteroidSize', 1, 5000).name('Size (meters)')
     asteroidFolder.add(params, 'asteroidSpeed', 1, 100).name('Speed (km/s)')
+    
+    // Add selected asteroid info display
+    const selectedAsteroidInfo = {
+      name: 'None Selected',
+      size: 'Unknown',
+      speed: 'Unknown',
+      composition: 'Unknown'
+    }
+    
+    asteroidFolder.add(selectedAsteroidInfo, 'name').name('Selected Asteroid').listen()
+    asteroidFolder.add(selectedAsteroidInfo, 'size').name('Real Size (m)').listen()
+    asteroidFolder.add(selectedAsteroidInfo, 'speed').name('Real Speed (km/s)').listen()
+    asteroidFolder.add(selectedAsteroidInfo, 'composition').name('Composition').listen()
+    
+    // Store reference for updates
+    this.selectedAsteroidInfo = selectedAsteroidInfo
+    
     asteroidFolder.open()
     
     // Add orbital paths controls
@@ -1096,6 +1118,169 @@ let app = {
     }
   },
 
+  onAsteroidClick(event) {
+    // Prevent double-click interference
+    event.preventDefault()
+    
+    const rect = renderer.domElement.getBoundingClientRect()
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+    raycaster.setFromCamera(mouse, camera)
+
+    // Check for intersections with interactive asteroids (orbiting ones)
+    const interactableObjects = this.orbitalPaths.filter(obj => 
+      obj.userData && obj.userData.isInteractive
+    )
+    
+    const intersects = raycaster.intersectObjects(interactableObjects)
+    
+    if (intersects.length > 0) {
+      // Reset previous selection
+      if (this.selectedAsteroid) {
+        this.resetAsteroidAppearance(this.selectedAsteroid)
+      }
+      
+      this.selectedAsteroid = intersects[0].object
+      this.highlightAsteroid(this.selectedAsteroid, 'select')
+      this.updateSelectedAsteroidInfo(this.selectedAsteroid)
+      
+      console.log('Asteroid clicked:', this.selectedAsteroid.userData.name)
+    } else {
+      // Check if clicking on Earth for impact simulation
+      const earthIntersects = raycaster.intersectObject(this.earth)
+      if (earthIntersects.length > 0) {
+        const intersectionPoint = earthIntersects[0].point
+        const coords = vector3ToLatLon(intersectionPoint)
+        
+        // Update coordinate display
+        this.updateCoordinateDisplay(coords.lat, coords.lon, intersectionPoint)
+        
+        // Add a temporary marker at clicked location
+        this.addTemporaryMarker(coords.lat, coords.lon)
+      } else {
+        // Clear selection if clicking on empty space
+        if (this.selectedAsteroid) {
+          this.resetAsteroidAppearance(this.selectedAsteroid)
+          this.selectedAsteroid = null
+          this.clearSelectedAsteroidInfo()
+        }
+      }
+    }
+  },
+
+  handleAsteroidSelection(event) {
+    const rect = renderer.domElement.getBoundingClientRect()
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+    raycaster.setFromCamera(mouse, camera)
+
+    // Check for intersections with interactive asteroids (orbiting ones)
+    const interactableObjects = this.orbitalPaths.filter(obj => 
+      obj.userData && obj.userData.isInteractive
+    )
+    
+    const intersects = raycaster.intersectObjects(interactableObjects)
+    
+    // Reset previous selection
+    if (this.selectedAsteroid) {
+      this.resetAsteroidAppearance(this.selectedAsteroid)
+    }
+    
+    if (intersects.length > 0) {
+      this.selectedAsteroid = intersects[0].object
+      this.highlightAsteroid(this.selectedAsteroid, 'select')
+      this.updateSelectedAsteroidInfo(this.selectedAsteroid)
+    } else {
+      this.selectedAsteroid = null
+      this.clearSelectedAsteroidInfo()
+    }
+  },
+
+  highlightAsteroid(asteroid, type) {
+    if (!asteroid.userData) return
+    
+    const userData = asteroid.userData
+    const highlightColor = type === 'select' ? 0xffff00 : 0xff6600 // Yellow for select, orange for hover
+    const highlightOpacity = type === 'select' ? 0.9 : 0.8
+    
+    // Highlight glow spheres
+    if (userData.glowSphere && userData.glowSphere.material) {
+      userData.glowSphere.material.color.setHex(highlightColor)
+      userData.glowSphere.material.opacity = highlightOpacity * 0.6
+    }
+    
+    if (userData.outerGlowSphere && userData.outerGlowSphere.material) {
+      userData.outerGlowSphere.material.color.setHex(highlightColor)
+      userData.outerGlowSphere.material.opacity = highlightOpacity * 0.3
+    }
+  },
+
+  resetAsteroidAppearance(asteroid) {
+    if (!asteroid.userData) return
+    
+    const userData = asteroid.userData
+    const originalColor = userData.originalColor || 0x00ff00
+    const originalOpacity = userData.originalOpacity || 0.7
+    
+    // Reset glow spheres
+    if (userData.glowSphere && userData.glowSphere.material) {
+      userData.glowSphere.material.color.setHex(originalColor)
+      userData.glowSphere.material.opacity = originalOpacity * 0.6
+    }
+    
+    if (userData.outerGlowSphere && userData.outerGlowSphere.material) {
+      userData.outerGlowSphere.material.color.setHex(originalColor)
+      userData.outerGlowSphere.material.opacity = originalOpacity * 0.3
+    }
+  },
+
+  updateSelectedAsteroidInfo(asteroid) {
+    if (!asteroid.userData || !this.selectedAsteroidInfo) return
+    
+    const userData = asteroid.userData
+    const name = userData.name || 'Unknown Asteroid'
+    
+    // Get properties from asterooidSizeandSpeedData if available
+    let properties = { 
+      size: 'Unknown', 
+      speed: 'Unknown', 
+      composition: 'Unknown' 
+    }
+    
+    // Look up properties in the imported data
+    if (asterooidSizeandSpeedData && asterooidSizeandSpeedData[name]) {
+      properties = asterooidSizeandSpeedData[name]
+      console.log(`Found asteroid properties for ${name}:`, properties)
+    } else {
+      console.warn(`No properties found for asteroid: ${name}`)
+      console.log('Available asteroids in properties file:', Object.keys(asterooidSizeandSpeedData || {}))
+    }
+    
+    // Update the GUI display
+    this.selectedAsteroidInfo.name = name
+    this.selectedAsteroidInfo.size = properties.size_km || 'Unknown'
+    this.selectedAsteroidInfo.speed = properties.speed_km_s || 'Unknown'
+    this.selectedAsteroidInfo.composition = properties.composition || 'Unknown'
+    
+    console.log(`Selected asteroid: ${name}`, {
+      size: this.selectedAsteroidInfo.size,
+      speed: this.selectedAsteroidInfo.speed,
+      composition: this.selectedAsteroidInfo.composition
+    })
+  },
+
+  clearSelectedAsteroidInfo() {
+    if (!this.selectedAsteroidInfo) return
+    
+    this.selectedAsteroidInfo.name = 'None Selected'
+    this.selectedAsteroidInfo.size = 'Unknown'
+    this.selectedAsteroidInfo.speed = 'Unknown'
+    this.selectedAsteroidInfo.composition = 'Unknown'
+  },
+
+  // Launch an asteroid toward a target position
   launchAsteroid(targetPosition) {
     // Use GUI parameters for size (meters) and speed (km/s)
     const sizeInMeters = params.asteroidSize; // 1m to 1500m
@@ -1745,6 +1930,10 @@ let app = {
     const labelSprite = new THREE.Sprite(labelMaterial);
     labelSprite.scale.set(8, 2, 1); // Scale the label appropriately
     
+    // Store original colors for reset
+    const originalColor = color
+    const originalOpacity = 0.7
+    
     orbitingAsteroid.userData = {
       pathPoints: pathPoints,
       currentIndex: 0,
@@ -1757,8 +1946,16 @@ let app = {
       },
       glowSphere: glowSphere,
       outerGlowSphere: outerGlowSphere,
-      labelSprite: labelSprite
+      labelSprite: labelSprite,
+      originalColor: originalColor,
+      originalOpacity: originalOpacity,
+      isInteractive: true
     };
+    
+    // Also add userData to glow spheres, orbital tube, and label for interaction
+    glowSphere.userData = orbitingAsteroid.userData
+    outerGlowSphere.userData = orbitingAsteroid.userData
+    labelSprite.userData = orbitingAsteroid.userData
     
     // Set initial positions for all elements
     if (pathPoints.length > 0) {
