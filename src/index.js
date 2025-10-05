@@ -21,6 +21,8 @@ import {
 } from "./coordinate-utils"
 // Debug utilities
 import { createDebugCoordinateGrid, testCoordinateMapping } from "./debug-coordinates"
+// Internationalization
+import i18n from "./i18n.js"
 import Albedo from "./assets/Albedo.jpg"
 import Bump from "./assets/Bump.jpg"
 import Clouds from "./assets/Clouds.png"
@@ -32,6 +34,9 @@ import GaiaSky from "./assets/Gaia_EDR3_darkened.png"
 import asteroidOrbitData from "./assets/asteroid_orbit_coords.json"
 
 global.THREE = THREE
+// Make i18n available globally for other modules
+global.i18n = i18n
+window.i18n = i18n
 // previously this feature is .legacyMode = false, see https://www.donmccurdy.com/2020/06/17/color-management-in-threejs/
 // turning this on has the benefit of doing certain automatic conversions (for hexadecimal and CSS colors from sRGB to linear-sRGB)
 THREE.ColorManagement.enabled = true
@@ -493,40 +498,43 @@ let app = {
 
   // Update coordinate display
   async updateCoordinateDisplay(lat, lon, position) {
-    const latStr = `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? 'N' : 'S'}`
-    const lonStr = `${Math.abs(lon).toFixed(4)}°${lon >= 0 ? 'E' : 'W'}`
+    // Format coordinates with compass directions in the current language
+    const latDir = lat >= 0 ? i18n.t('coordinates.north') : i18n.t('coordinates.south');
+    const lonDir = lon >= 0 ? i18n.t('coordinates.east') : i18n.t('coordinates.west');
+    const latStr = `${Math.abs(lat).toFixed(4)}°${latDir}`;
+    const lonStr = `${Math.abs(lon).toFixed(4)}°${lonDir}`;
     
     // Debug logging
-    console.log(`Clicked coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)}`)
+    console.log(i18n.t('coordinates.clicked', { lat: lat.toFixed(4), lon: lon.toFixed(4) }))
     
     // Show loading state first
     this.coordInfoDiv.innerHTML = `
-      <strong>Latitude:</strong> ${latStr}<br>
-      <strong>Longitude:</strong> ${lonStr}<br>
-      <strong>Region:</strong> <span style="color: #888;">Loading...</span>
+      <strong>${i18n.t('coordinates.latitude')}:</strong> ${latStr}<br>
+      <strong>${i18n.t('coordinates.longitude')}:</strong> ${lonStr}<br>
+      <strong>${i18n.t('coordinates.region')}:</strong> <span style="color: #888;">${i18n.t('info.loading_data')}</span>
     `
     
     // Get location asynchronously
     try {
       const region = await getRegionName(lat, lon)
       this.coordInfoDiv.innerHTML = `
-        <strong>Latitude:</strong> ${latStr}<br>
-        <strong>Longitude:</strong> ${lonStr}<br>
-        <strong>Region:</strong> ${region}
+        <strong>${i18n.t('coordinates.latitude')}:</strong> ${latStr}<br>
+        <strong>${i18n.t('coordinates.longitude')}:</strong> ${lonStr}<br>
+        <strong>${i18n.t('coordinates.region')}:</strong> ${region}
       `
     } catch (error) {
       console.warn('Failed to get region name:', error)
       this.coordInfoDiv.innerHTML = `
-        <strong>Latitude:</strong> ${latStr}<br>
-        <strong>Longitude:</strong> ${lonStr}<br>
-        <strong>Region:</strong> <span style="color: #ff6666;">Location lookup failed</span>
+        <strong>${i18n.t('coordinates.latitude')}:</strong> ${latStr}<br>
+        <strong>${i18n.t('coordinates.longitude')}:</strong> ${lonStr}<br>
+        <strong>${i18n.t('coordinates.region')}:</strong> <span style="color: #ff6666;">${i18n.t('errors.location_lookup_failed') || 'Location lookup failed'}</span>
       `
     }
     
     // Calculate distance to target location
     const distance = calculateDistance(lat, lon, params.targetLat, params.targetLon)
     this.locationInfoDiv.innerHTML = `
-      <strong>Distance to target:</strong> ${distance.toFixed(0)} km
+      <strong>${i18n.t('coordinates.distance_to_target')}:</strong> ${distance.toFixed(0)} ${i18n.t('measurements.kilometers')}
     `
   },
 
@@ -652,12 +660,12 @@ let app = {
   // Go to user's current location using geolocation
   goToMyLocation() {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by this browser.')
+      alert(i18n.t('errors.geolocation_not_supported'))
       return
     }
 
     // Show loading message
-    console.log('Getting your location...')
+    console.log(i18n.t('info.loading_data'))
     
     const options = {
       enableHighAccuracy: true,
@@ -671,7 +679,11 @@ let app = {
         const lon = position.coords.longitude
         const accuracy = position.coords.accuracy
 
-        console.log(`Your location: ${lat.toFixed(4)}, ${lon.toFixed(4)} (±${accuracy}m)`)
+        console.log(i18n.t('coordinates.your_location', { 
+          lat: lat.toFixed(4), 
+          lon: lon.toFixed(4), 
+          accuracy: accuracy 
+        }))
         
         // Add a special marker for user's location
         this.addUserLocationMarker(lat, lon)
@@ -685,31 +697,38 @@ let app = {
         // Show success message with location info
         try {
           const region = await getRegionName(lat, lon)
-          alert(`Found your location in ${region}!\nCoordinates: ${lat.toFixed(4)}°, ${lon.toFixed(4)}°`)
+          alert(i18n.t('coordinates.found_location_region', { 
+            region: region,
+            lat: lat.toFixed(4), 
+            lon: lon.toFixed(4) 
+          }))
         } catch (error) {
-          alert(`Found your location!\nCoordinates: ${lat.toFixed(4)}°, ${lon.toFixed(4)}°`)
+          alert(i18n.t('coordinates.found_location', { 
+            lat: lat.toFixed(4), 
+            lon: lon.toFixed(4) 
+          }))
         }
       },
       (error) => {
-        let errorMessage = 'Unable to get your location. '
+        let errorKey = 'errors.location_unknown'
         
         switch(error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage += 'Location access denied by user.'
+            errorKey = 'errors.location_permission_denied'
             break
           case error.POSITION_UNAVAILABLE:
-            errorMessage += 'Location information unavailable.'
+            errorKey = 'errors.location_unavailable'
             break
           case error.TIMEOUT:
-            errorMessage += 'Location request timed out.'
+            errorKey = 'errors.location_timeout'
             break
           default:
-            errorMessage += 'An unknown error occurred.'
+            errorKey = 'errors.location_unknown'
             break
         }
         
         console.error('Geolocation error:', error)
-        alert(errorMessage)
+        alert(i18n.t(errorKey))
       },
       options
     )
@@ -1431,7 +1450,7 @@ window.addMarkerAtInput = function() {
   const lon = parseFloat(document.getElementById('lon-input').value)
   
   if (isNaN(lat) || isNaN(lon)) {
-    alert('Please enter valid latitude and longitude values')
+    alert(window.i18n.t('errors.invalid_coordinates') || 'Please enter valid latitude and longitude values')
     return
   }
   

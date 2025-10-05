@@ -1,0 +1,78 @@
+{
+  "title": "Three.js Earth - 交互式3D地球",
+  "loading": {
+    "progress": "正在加载地球..."
+  },
+  "navigation": {
+    "title": "导航到坐标",
+    "latitude": "纬度:",
+    "longitude": "经度:",
+    "latitude_placeholder": "纬度",
+    "longitude_placeholder": "经度",
+    "go_to_location": "前往位置",
+    "add_marker": "添加标记",
+    "my_location": "📍 我的位置",
+    "quick_locations": "快速位置:",
+    "click_instruction": "点击地球获取该点的坐标"
+  },
+  "locations": {
+    "london": "伦敦",
+    "tokyo": "东京",
+    "sydney": "悉尼",
+    "new_york": "纽约",
+    "paris": "巴黎",
+    "rio_de_janeiro": "里约热内卢",
+    "cairo": "开罗",
+    "mumbai": "孟买",
+    "moscow": "莫斯科",
+    "cape_town": "开普敦",
+    "beijing": "北京",
+    "los_angeles": "洛杉矶",
+    "dubai": "迪拜",
+    "singapore": "新加坡",
+    "reykjavik": "雷克雅未克",
+    "greenwich": "格林威治 (0°,0°)",
+    "null_island": "零岛 (0°,0°)"
+  },
+  "countries": {
+    "united_states": "美国",
+    "united_kingdom": "英国",
+    "japan": "日本",
+    "australia": "澳大利亚",
+    "france": "法国",
+    "brazil": "巴西",
+    "egypt": "埃及",
+    "india": "印度",
+    "russia": "俄罗斯",
+    "south_africa": "南非",
+    "china": "中国",
+    "united_arab_emirates": "阿联酋",
+    "singapore": "新加坡",
+    "iceland": "冰岛"
+  },
+  "coordinates": {
+    "format": "{{lat}}°, {{lon}}°",
+    "clicked": "点击坐标: {{lat}}, {{lon}}",
+    "your_location": "您的位置: {{lat}}, {{lon}} (±{{accuracy}}米)",
+    "found_location": "找到您的位置！\\n坐标: {{lat}}°, {{lon}}°",
+    "found_location_region": "在{{region}}找到您的位置！\\n坐标: {{lat}}°, {{lon}}°"
+  },
+  "errors": {
+    "geolocation_not_supported": "此浏览器不支持地理定位。",
+    "location_permission_denied": "用户拒绝访问位置。",
+    "location_unavailable": "位置信息不可用。",
+    "location_timeout": "位置请求超时。",
+    "location_unknown": "获取位置时发生未知错误。",
+    "invalid_coordinates": "请输入有效的纬度和经度值",
+    "location_lookup_failed": "位置查找失败"
+  },
+  "ui": {
+    "language": "语言",
+    "select_language": "选择语言"
+  },
+  "info": {
+    "asteroid_info": "小行星信息",
+    "earth_info": "地球信息",
+    "loading_data": "正在加载数据..."
+  }
+}
