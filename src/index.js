@@ -459,8 +459,8 @@ let app = {
 
       names.sort()
 
-      // Prepare options with a null/None entry
-      const options = [null].concat(names)
+  // Prepare options with a 'None' entry as the first label (dat.GUI may coerce null to string)
+  const options = ['None'].concat(names)
 
       // Update controller options - dat.GUI doesn't have a direct update, so recreate controller
       if (!this._asteroidGuiControllers) {
@@ -488,6 +488,11 @@ let app = {
 
   // Handle selection change from Asteroids GUI
   handleAsteroidSelection(asteroidName) {
+    // Normalize 'None' or string 'null' selections to real null for reset handling
+    if (asteroidName === 'None' || (typeof asteroidName === 'string' && asteroidName.toLowerCase() === 'null')) {
+      asteroidName = null
+    }
+    console.log('Asteroid selection changed ->', asteroidName)
     if (!asteroidName) {
       // Reset all orbital path materials to original color/opacity
       this.orbitalPaths.forEach(pathObject => {
