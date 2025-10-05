@@ -127,6 +127,88 @@
         background: #333;
         color: white;
       }
+      #impact-zones-window {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 350px;
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #0066cc;
+        border-radius: 8px;
+        color: white;
+        font-family: Arial, sans-serif;
+        z-index: 1002;
+        box-shadow: 0 4px 20px rgba(0, 102, 204, 0.3);
+      }
+      #impact-zones-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 15px;
+        background: rgba(0, 102, 204, 0.2);
+        border-bottom: 1px solid #0066cc;
+        border-radius: 6px 6px 0 0;
+      }
+      #impact-zones-header h3 {
+        margin: 0;
+        font-size: 16px;
+        color: #0066cc;
+      }
+      #close-zones-window {
+        background: none;
+        border: none;
+        color: #ccc;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 0;
+        width: 25px;
+        height: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #close-zones-window:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+      }
+      #impact-zones-content {
+        padding: 15px;
+      }
+      .zone-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .zone-info:last-child {
+        border-bottom: none;
+      }
+      .zone-info strong {
+        color: #0066cc;
+        font-size: 13px;
+      }
+      .zone-info span {
+        color: #fff;
+        font-size: 13px;
+        font-weight: bold;
+      }
+      .crater-zone strong {
+        color: #8B0000 !important; /* Dark red */
+      }
+      .fireball-zone strong {
+        color: #FF4500 !important; /* Orange-red */
+      }
+      .overpressure-zone strong {
+        color: #FF1493 !important; /* Deep pink */
+      }
+      .wind-zone strong {
+        color: #9370DB !important; /* Medium purple */
+      }
+      .seismic-zone strong {
+        color: #32CD32 !important; /* Lime green */
+      }
     </style>
   </head>
   <body>
@@ -145,6 +227,36 @@
         <option value="de">Deutsch</option>
         <option value="zh">中文</option>
       </select>
+    </div>
+    
+    <!-- Impact Zones Display Window -->
+    <div id="impact-zones-window" style="display: none;">
+      <div id="impact-zones-header">
+        <h3 data-i18n="ui.impact_zones">Impact Zones</h3>
+        <button id="close-zones-window">&times;</button>
+      </div>
+      <div id="impact-zones-content">
+        <div class="zone-info">
+          <strong data-i18n="ui.impact_energy">Impact Energy:</strong>
+          <span id="zone-energy">-</span>
+        </div>
+        <div class="zone-info crater-zone">
+          <strong data-i18n="ui.crater_zone">Crater (100% destruction):</strong>
+          <span id="zone-crater">-</span>
+        </div>
+        <div class="zone-info fireball-zone">
+          <strong data-i18n="ui.fireball_zone">Fireball (50% mortality):</strong>
+          <span id="zone-fireball">-</span>
+        </div>
+        <div class="zone-info seismic-zone">
+          <strong data-i18n="ui.seismic_zone">Seismic (Meff 7.0):</strong>
+          <span id="zone-seismic">-</span>
+        </div>
+        <div class="zone-info">
+          <strong data-i18n="ui.impact_location">Impact Location:</strong>
+          <span id="zone-location">-</span>
+        </div>
+      </div>
     </div>
     
     <!-- Coordinate Input Interface -->
@@ -200,6 +312,57 @@
           buttons[2].textContent = window.i18n.translateLocation('Sydney');
         }
       }
+
+      // Impact Zones Window Management
+      function showImpactZonesWindow() {
+        const window = document.getElementById('impact-zones-window');
+        window.style.display = 'block';
+      }
+
+      function hideImpactZonesWindow() {
+        const window = document.getElementById('impact-zones-window');
+        window.style.display = 'none';
+      }
+
+      function updateImpactZonesDisplay(lat, lon, zones) {
+        // Format distance with appropriate units
+        function formatDistance(meters) {
+          if (meters === 0 || !meters || isNaN(meters)) return 'No damage';
+          if (meters < 1000) return `${meters.toFixed(1)} m`;
+          if (meters < 100000) return `${(meters/1000).toFixed(2)} km`;
+          return `${(meters/1000).toFixed(0)} km`;
+        }
+
+        // Format energy
+        function formatEnergy(kt) {
+          if (kt < 1) return `${(kt * 1000).toFixed(0)} tons TNT`;
+          if (kt < 1000) return `${kt.toFixed(1)} kt TNT`;
+          return `${(kt/1000).toFixed(2)} Mt TNT`;
+        }
+
+        // Update the display values
+        document.getElementById('zone-energy').textContent = formatEnergy(zones.energy_kt);
+        document.getElementById('zone-crater').textContent = formatDistance(zones.crater.D_final_m / 2);
+        document.getElementById('zone-fireball').textContent = formatDistance(zones.fireball50_m);
+        document.getElementById('zone-seismic').textContent = formatDistance(zones.seismicDamage_m);
+        document.getElementById('zone-location').textContent = `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+
+        // Show the window
+        showImpactZonesWindow();
+      }
+
+      // Make functions available globally
+      window.showImpactZonesWindow = showImpactZonesWindow;
+      window.hideImpactZonesWindow = hideImpactZonesWindow;
+      window.updateImpactZonesDisplay = updateImpactZonesDisplay;
+
+      // Add event listener for close button
+      document.addEventListener('DOMContentLoaded', () => {
+        const closeButton = document.getElementById('close-zones-window');
+        if (closeButton) {
+          closeButton.addEventListener('click', hideImpactZonesWindow);
+        }
+      });
     </script>
   </body>
 </html>

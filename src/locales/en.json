@@ -194,7 +194,15 @@
   },
   "ui": {
     "language": "Language",
-    "select_language": "Select Language"
+    "select_language": "Select Language",
+    "impact_zones": "Impact Zones",
+    "impact_energy": "Impact Energy",
+    "crater_zone": "Crater (100% destruction)",
+    "fireball_zone": "Fireball (50% mortality)",
+    "overpressure_zone": "Shockwave (0.5 kPa / 0.07 psi)",
+    "wind_zone": "Wind Blast (10 m/s / 22 mph)",
+    "seismic_zone": "Seismic (Meff 7.0)",
+    "impact_location": "Impact Location"
   },
   "info": {
     "asteroid_info": "Asteroid Information",

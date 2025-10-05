@@ -1,7 +1,8 @@
 {
   "title": "Three.js Earth - Interaktiver 3D-Globus",
   "loading": {
-    "progress": "Erde wird geladen..."
+     "overpressure_zone": "Druckwelle (0.5 kPa / 0.07 psi)",
+    "wind_zone": "Windstoß (10 m/s / 22 mph)", "progress": "Erde wird geladen..."
   },
   "navigation": {
     "title": "Zu Koordinaten navigieren",
@@ -68,7 +69,15 @@
   },
   "ui": {
     "language": "Sprache",
-    "select_language": "Sprache auswählen"
+    "select_language": "Sprache auswählen",
+    "impact_zones": "Aufprallzonen",
+    "impact_energy": "Aufprallenergie",
+    "crater_zone": "Krater (100% Zerstörung)",
+    "fireball_zone": "Feuerball (50% Sterblichkeit)",
+    "overpressure_zone": "Druckwelle (0.2 kPa / 0.03 psi)",
+    "wind_zone": "Windstoß (5 m/s / 11 mph)",
+    "seismic_zone": "Seismisch (Meff 7.0)",
+    "impact_location": "Aufprallort"
   },
   "info": {
     "asteroid_info": "Asteroidinformationen",

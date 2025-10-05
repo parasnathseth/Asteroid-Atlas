@@ -81,7 +81,15 @@
   },
   "ui": {
     "language": "Langue",
-    "select_language": "Sélectionner la Langue"
+    "select_language": "Sélectionner la Langue",
+    "impact_zones": "Zones d'Impact",
+    "impact_energy": "Énergie d'Impact",
+    "crater_zone": "Cratère (100% destruction)",
+    "fireball_zone": "Boule de Feu (50% mortalité)",
+    "overpressure_zone": "Onde de Choc (0.5 kPa / 0.07 psi)",
+    "wind_zone": "Rafale de Vent (10 m/s / 22 mph)",
+    "seismic_zone": "Sismique (Meff 7.0)",
+    "impact_location": "Lieu d'Impact"
   },
   "info": {
     "asteroid_info": "Informations sur l'Astéroïde",

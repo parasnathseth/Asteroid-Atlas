@@ -1476,10 +1476,10 @@ let app = {
     const material = new THREE.LineBasicMaterial({
       color: config.color,
       transparent: true,
-      opacity: config.opacity,
-      linewidth: 3
+      opacity: Math.max(config.opacity, 0.8), // Ensure minimum visibility
+      linewidth: 5 // Make lines thicker for better visibility
     });
-    
+
     const circle = new THREE.Line(geometry, material);
     circle.userData = {
       type: 'impactZone',
@@ -1487,11 +1487,10 @@ let app = {
       label: config.label,
       radius_m: radius_m
     };
-    
+
     // Add to scene
-    this.group.add(circle)
-    
-   
+    this.group.add(circle);
+    console.log(`Added ${config.name} zone circle to scene with radius ${radius_m.toFixed(1)}m`);   
   },
 
   // Create impact flash effect
@@ -1790,38 +1789,31 @@ let app = {
         opacity: 1.0,
         label: 'Fireball (50% mortality)'
       },
-      // {
-      //   name: 'overpressure', 
-      //   radius_m: zones.overpressure50_m,
-      //   color: 0xFF1493,  // Deep pink - blast overpressure
-      //   opacity: 1.0,
-      //   label: 'Overpressure (50% mortality)'
-      // },
-      // {
-      //   name: 'wind',
-      //   radius_m: zones.wind50_m,
-      //   color: 0x9370DB,  // Medium purple - wind blast
-      //   opacity: 1.0,
-      //   label: 'Wind Blast (50% mortality)'
-      // },
-      // {
-      //   name: 'seismic',
-      //   radius_m: zones.seismic50_m,
-      //   color: 0x32CD32,  // Lime green - seismic/earthquake
-      //   opacity: 1.0,
-      //   label: 'Seismic (50% mortality)'
-      // }
+      {
+        name: 'seismic',
+        radius_m: zones.seismicDamage_m,
+        color: 0x32CD32,  // Lime green - seismic/earthquake
+        opacity: 1.0,
+        label: 'Seismic Damage'
+      }
     ];
 
     // Sort zones by radius (largest first) so they render properly
     zoneConfigs.sort((a, b) => (b.radius_m || 0) - (a.radius_m || 0));
 
     // Create each zone as a circle on Earth's surface
+    let zonesCreated = 0;
     zoneConfigs.forEach(config => {
       if (config.radius_m && !isNaN(config.radius_m) && config.radius_m > 0) {
+        console.log(`Creating ${config.name} zone with radius ${config.radius_m.toFixed(1)}m`);
         this.createImpactZoneCircle(centerLat, centerLon, config);
+        zonesCreated++;
+      } else {
+        console.log(`Skipping ${config.name} zone - invalid radius:`, config.radius_m);
       }
     });
+    
+    console.log(`Total zones created: ${zonesCreated} out of ${zoneConfigs.length}`);
 
     // Use the addImpactZoneInfo function from ImpactZones module
     ImpactZones.addImpactZoneInfo(centerLat, centerLon, zones);
