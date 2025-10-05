@@ -1288,8 +1288,8 @@ let app = {
       }
     });
 
-    // Add legend/info display for this impact
-    this.addImpactZoneInfo(centerLat, centerLon, zones);
+    // Use the addImpactZoneInfo function from ImpactZones module
+    ImpactZones.addImpactZoneInfo(centerLat, centerLon, zones);
   },
 
   createImpactZoneCircle(centerLat, centerLon, config) {
@@ -1380,73 +1380,7 @@ let app = {
     }
   },
 
-  addImpactZoneInfo(centerLat, centerLon, zones) {
-    // Create info display for the impact zones
-    const infoDiv = document.createElement('div');
-    infoDiv.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 10px;
-      transform: translateY(-50%);
-      background: rgba(0, 0, 0, 0.9);
-      color: white;
-      padding: 15px;
-      border-radius: 8px;
-      font-family: Arial, sans-serif;
-      font-size: 12px;
-      max-width: 300px;
-      z-index: 1500;
-      border-left: 4px solid #ff6600;
-    `
-    
-    const formatDistance = (distance_m) => {
-      if (!distance_m || isNaN(distance_m)) return 'N/A';
-      if (distance_m < 1000) return `${Math.round(distance_m)} m`;
-      return `${(distance_m / 1000).toFixed(1)} km`;
-    };
-    
-    infoDiv.innerHTML = `
-      <h4 style="margin: 0 0 10px 0; color: #ff6600;">Impact Zones</h4>
-      <div style="font-size: 11px; margin-bottom: 10px;">
-        Location: ${centerLat.toFixed(3)}°, ${centerLon.toFixed(3)}°
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #8B0000;">●</span> Crater: ${formatDistance(zones.crater.D_final_m)} (100% mortality)
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #FF4500;">●</span> Fireball: ${formatDistance(zones.fireball50_m)} (50% mortality)
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #FF1493;">●</span> Overpressure: ${formatDistance(zones.overpressure50_m)} (50% mortality)
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #9370DB;">●</span> Wind Blast: ${formatDistance(zones.wind50_m)} (50% mortality)
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #32CD32;">●</span> Seismic: ${formatDistance(zones.seismic50_m)} (50% mortality)
-      </div>
-      <div style="margin-top: 10px; font-size: 10px; color: #ccc;">
-        Energy: ${(zones.energy_J / 4.184e12).toFixed(2)} kt TNT<br>
-        Click elsewhere to dismiss
-      </div>
-    `
-    
-    document.body.appendChild(infoDiv)
-    
-    // Remove info display after 10 seconds or on next click
-    const removeInfo = () => {
-      if (infoDiv.parentNode) {
-        document.body.removeChild(infoDiv);
-      }
-      document.removeEventListener('click', removeInfo);
-    };
-    
-    setTimeout(removeInfo, 10000);
-    document.addEventListener('click', removeInfo);
-  },
-
-  // ...existing code...
-
+  // Create impact flash effect
   createImpactFlash(impactPosition, asteroidSize = 100, speed = 10) {
     // Create a bright flash at impact point, scale with asteroid size and speed
     const baseScale = 0.5; // Larger base scale
@@ -1909,8 +1843,8 @@ let app = {
       }
     });
 
-    // Add legend/info display for this impact
-    this.addImpactZoneInfo(centerLat, centerLon, zones);
+    // Use the addImpactZoneInfo function from ImpactZones module
+    ImpactZones.addImpactZoneInfo(centerLat, centerLon, zones);
   },
 
   createImpactZoneCircle(centerLat, centerLon, config) {
@@ -2001,73 +1935,7 @@ let app = {
     }
   },
 
-  addImpactZoneInfo(centerLat, centerLon, zones) {
-    // Create info display for the impact zones
-    const infoDiv = document.createElement('div');
-    infoDiv.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 10px;
-      transform: translateY(-50%);
-      background: rgba(0, 0, 0, 0.9);
-      color: white;
-      padding: 15px;
-      border-radius: 8px;
-      font-family: Arial, sans-serif;
-      font-size: 12px;
-      max-width: 300px;
-      z-index: 1500;
-      border-left: 4px solid #ff6600;
-    `
-    
-    const formatDistance = (distance_m) => {
-      if (!distance_m || isNaN(distance_m)) return 'N/A';
-      if (distance_m < 1000) return `${Math.round(distance_m)} m`;
-      return `${(distance_m / 1000).toFixed(1)} km`;
-    };
-    
-    infoDiv.innerHTML = `
-      <h4 style="margin: 0 0 10px 0; color: #ff6600;">Impact Zones</h4>
-      <div style="font-size: 11px; margin-bottom: 10px;">
-        Location: ${centerLat.toFixed(3)}°, ${centerLon.toFixed(3)}°
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #8B0000;">●</span> Crater: ${formatDistance(zones.crater.D_final_m)}
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #FF4500;">●</span> Fireball: ${formatDistance(zones.fireball50_m)}
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #FF1493;">●</span> Overpressure: ${formatDistance(zones.overpressure50_m)}
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #9370DB;">●</span> Wind Blast: ${formatDistance(zones.wind50_m)}
-      </div>
-      <div style="margin-bottom: 5px;">
-        <span style="color: #32CD32;">●</span> Seismic: ${formatDistance(zones.seismic50_m)}
-      </div>
-      <div style="margin-top: 10px; font-size: 10px; color: #ccc;">
-        Energy: ${(zones.energy_J / 4.184e12).toFixed(2)} kt TNT<br>
-        Click elsewhere to dismiss
-      </div>
-    `
-    
-    document.body.appendChild(infoDiv)
-    
-    // Remove info display after 10 seconds or on next click
-    const removeInfo = () => {
-      if (infoDiv.parentNode) {
-        document.body.removeChild(infoDiv);
-      }
-      document.removeEventListener('click', removeInfo);
-    };
-    
-    setTimeout(removeInfo, 10000);
-    document.addEventListener('click', removeInfo);
-  },
-
-  // ...existing code...
-
+  // Create impact flash effect
   createImpactFlash(impactPosition, asteroidSize = 100, speed = 10) {
     // Create a bright flash at impact point, scale with asteroid size and speed
     const baseScale = 0.5; // Larger base scale
@@ -2473,6 +2341,7 @@ let app = {
     });
   }
 }
+
 
 runApp(app, scene, renderer, camera, true, undefined, undefined)
 

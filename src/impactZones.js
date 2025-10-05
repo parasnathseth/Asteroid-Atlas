@@ -229,8 +229,115 @@ const ImpactZones = (function () {
     };
   }
 
+  // Add impact zone info panel with close button and persistence
+  function addImpactZoneInfo(centerLat, centerLon, zones) {
+    // Check if info panel already exists - update it instead of creating new one
+    let infoDiv = document.getElementById('impact-zone-info');
+    
+    if (!infoDiv) {
+      // Create new info display for the impact zones
+      infoDiv = document.createElement('div');
+      infoDiv.id = 'impact-zone-info';
+      infoDiv.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 10px;
+        transform: translateY(-50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        max-width: 300px;
+        z-index: 1500;
+        border-left: 4px solid #ff6600;
+      `;
+      
+      // Add close button
+      const closeButton = document.createElement('button');
+      closeButton.innerHTML = '✕';
+      closeButton.style.cssText = `
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: #ff6600;
+        color: white;
+        border: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      `;
+      
+      closeButton.addEventListener('mouseenter', () => {
+        closeButton.style.background = '#cc5200';
+        closeButton.style.transform = 'scale(1.1)';
+      });
+      
+      closeButton.addEventListener('mouseleave', () => {
+        closeButton.style.background = '#ff6600';
+        closeButton.style.transform = 'scale(1)';
+      });
+      
+      closeButton.addEventListener('click', () => {
+        document.body.removeChild(infoDiv);
+      });
+      
+      infoDiv.appendChild(closeButton);
+      document.body.appendChild(infoDiv);
+    }
+    
+    const formatDistance = (distance_m) => {
+      if (!distance_m || isNaN(distance_m)) return 'N/A';
+      if (distance_m < 1000) return `${Math.round(distance_m)} m`;
+      return `${(distance_m / 1000).toFixed(1)} km`;
+    };
+    
+    // Update the content (excluding the close button)
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = `
+      <h4 style="margin: 0 0 10px 0; color: #ff6600; padding-right: 25px;">Impact Zones</h4>
+      <div style="font-size: 11px; margin-bottom: 10px;">
+        Location: ${centerLat.toFixed(3)}°, ${centerLon.toFixed(3)}°
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #8B0000;">●</span> Crater: ${formatDistance(zones.crater.D_final_m)}
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #FF4500;">●</span> Fireball: ${formatDistance(zones.fireball50_m)}
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #FF1493;">●</span> Overpressure: ${formatDistance(zones.overpressure50_m)}
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #9370DB;">●</span> Wind Blast: ${formatDistance(zones.wind50_m)}
+      </div>
+      <div style="margin-bottom: 5px;">
+        <span style="color: #32CD32;">●</span> Seismic: ${formatDistance(zones.seismic50_m)}
+      </div>
+      <div style="margin-top: 10px; font-size: 10px; color: #ccc;">
+        Energy: ${(zones.energy_J / 4.184e12).toFixed(2)} kt TNT<br>
+        <span style="font-style: italic;">Most recent impact</span>
+      </div>
+    `;
+    
+    // Replace the content while keeping the close button
+    const closeButton = infoDiv.querySelector('button');
+    infoDiv.innerHTML = '';
+    infoDiv.appendChild(closeButton);
+    infoDiv.appendChild(contentDiv);
+  }
+
   return {
     computeAll,
+    addImpactZoneInfo, // Export the new function
     // also expose individual helpers:
     transientCraterDiameter,
     finalCraterDiameter,
