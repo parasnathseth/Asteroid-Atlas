@@ -392,6 +392,40 @@ let app = {
     })
     orbitalFolder.open()
 
+    // Asteroids folder (list of orbiting asteroids)
+    const asteroidsFolder = gui.addFolder('Asteroids')
+    // We'll populate this list after orbital paths are created
+    this._asteroidGuiControllers = this._asteroidGuiControllers || {
+      selectedAsteroid: null
+    }
+    // Add a placeholder controller which will be replaced when data is ready
+    this._asteroidListController = asteroidsFolder.add(this._asteroidGuiControllers, 'selectedAsteroid', [null]).name('Select Asteroid')
+    this._asteroidListController.onChange((value) => {
+      // value will be asteroid name or null
+      this.handleAsteroidSelection(value)
+    })
+
+    // If a deferred build was requested earlier (orbital paths created before GUI initialized), apply it now
+    if (this._pendingAsteroidListOptions && Array.isArray(this._pendingAsteroidListOptions)) {
+      try {
+        // remove placeholder controller DOM node safely (may be inside a folder element)
+        if (this._asteroidListController && this._asteroidListController.__li && this._asteroidListController.__li.parentNode) {
+          this._asteroidListController.__li.parentNode.removeChild(this._asteroidListController.__li)
+        }
+
+        this._asteroidGuiControllers.selectedAsteroid = null
+        // Log pending options for debugging
+        console.log('Applying pending asteroid list options:', this._pendingAsteroidListOptions.length - 1, 'asteroids')
+        this._asteroidListController = window.gui.__folders['Asteroids'].add(this._asteroidGuiControllers, 'selectedAsteroid', this._pendingAsteroidListOptions).name('Select Asteroid')
+        this._asteroidListController.onChange((value) => this.handleAsteroidSelection(value))
+      } catch (e) {
+        console.warn('Failed to apply pending asteroid list options', e)
+      }
+      this._pendingAsteroidListOptions = null
+    }
+
+    asteroidsFolder.open()
+
     // Stats - show fps
     this.stats1 = new Stats()
     this.stats1.showPanel(0) // Panel 0 = fps
@@ -400,6 +434,123 @@ let app = {
     this.container.appendChild(this.stats1.domElement)
 
     await updateLoadingProgressBar(1.0, 100)
+  },
+
+  // Build asteroid GUI l,ist from available orbital paths
+  buildAsteroidGuiList() {
+    try {
+      // Collect unique asteroid names from orbitalPaths userData
+      const names = []
+      this.orbitalPaths.forEach(obj => {
+        if (obj && obj.userData && obj.userData.asteroidName) {
+          const n = obj.userData.asteroidName
+          console.log("Name: ", n)
+          if (!names.includes(n)) names.push(n)
+        }
+      })
+
+      // If we created orbiting asteroids (which may store name in userData.name)
+      this.orbitalPaths.forEach(obj => {
+        if (obj && obj.userData && obj.userData.name) {
+          const n = obj.userData.name
+          if (!names.includes(n)) names.push(n)
+        }
+      })
+
+      names.sort()
+
+      // Prepare options with a null/None entry
+      const options = [null].concat(names)
+
+      // Update controller options - dat.GUI doesn't have a direct update, so recreate controller
+      if (!this._asteroidGuiControllers) {
+        // GUI not initialized yet - store options to be applied later
+        this._pendingAsteroidListOptions = options
+        console.warn('Asteroid GUI controllers not initialized yet, deferring list build')
+        return
+      }
+
+      if (this._asteroidListController && this._asteroidListController.__li && this._asteroidListController.__li.parentNode) {
+        // remove old controller DOM node safely
+        this._asteroidListController.__li.parentNode.removeChild(this._asteroidListController.__li)
+      }
+
+      // Log discovered asteroid names for debugging
+      console.log('Asteroid GUI options:', options.length - 1, 'asteroids ->', options.slice(1))
+
+      this._asteroidGuiControllers.selectedAsteroid = null
+      this._asteroidListController = window.gui.__folders['Asteroids'].add(this._asteroidGuiControllers, 'selectedAsteroid', options).name('Select Asteroid')
+      this._asteroidListController.onChange((value) => this.handleAsteroidSelection(value))
+    } catch (e) {
+      console.warn('Failed to build asteroid GUI list', e)
+    }
+  },
+
+  // Handle selection change from Asteroids GUI
+  handleAsteroidSelection(asteroidName) {
+    if (!asteroidName) {
+      // Reset all orbital path materials to original color/opacity
+      this.orbitalPaths.forEach(pathObject => {
+        if (!pathObject || !pathObject.material) return
+
+        const orig = pathObject.userData && pathObject.userData._originalMaterial ? pathObject.userData._originalMaterial : null
+        if (orig) {
+          try {
+            if (pathObject.material.color && orig.color) pathObject.material.color.copy(orig.color)
+            pathObject.material.opacity = typeof orig.opacity === 'number' ? orig.opacity : 0.7
+            pathObject.material.transparent = typeof orig.transparent === 'boolean' ? orig.transparent : false
+          } catch (e) {
+            // fallback
+            pathObject.material.opacity = typeof orig.opacity === 'number' ? orig.opacity : 0.7
+            pathObject.material.transparent = typeof orig.transparent === 'boolean' ? orig.transparent : false
+          }
+        } else {
+          // No stored original; try to set sensible defaults depending on material type
+          try {
+            if (pathObject.material.color) {
+              // leave color as-is if set; otherwise set to white
+              if (!pathObject.material.color) pathObject.material.color = new THREE.Color(0xffffff)
+            }
+            pathObject.material.opacity = 0.8
+            pathObject.material.transparent = true
+          } catch (e) {
+            // ignore
+          }
+        }
+      })
+      return
+    }
+
+    // Highlight the selected asteroid's path and grey out others
+    this.orbitalPaths.forEach(pathObject => {
+      if (!pathObject || !pathObject.material) return
+
+      // Save original material properties on first use
+      if (!pathObject.userData._originalMaterial) {
+        try {
+          pathObject.userData._originalMaterial = {
+            color: pathObject.material.color ? pathObject.material.color.clone() : new THREE.Color(0xffffff),
+            opacity: pathObject.material.opacity,
+            transparent: pathObject.material.transparent
+          }
+        } catch (e) {
+          pathObject.userData._originalMaterial = { color: new THREE.Color(0xffffff), opacity: pathObject.material.opacity, transparent: pathObject.material.transparent }
+        }
+      }
+
+      const match = (pathObject.userData.asteroidName === asteroidName) || (pathObject.userData.name === asteroidName)
+      if (match) {
+        // Highlight - restore original
+        try { pathObject.material.color.copy(pathObject.userData._originalMaterial.color) } catch (e) {}
+        pathObject.material.opacity = Math.max(0.9, pathObject.userData._originalMaterial.opacity || 0.9)
+        pathObject.material.transparent = true
+      } else {
+        // Grey out - set to light grey and lower opacity
+        try { pathObject.material.color.setHex(0x999999) } catch (e) {}
+        pathObject.material.opacity = 0.15
+        pathObject.material.transparent = true
+      }
+    })
   },
 
   // Initialize the coordinate mapping system
@@ -1517,6 +1668,28 @@ let app = {
       colorIndex++;
       pathCount++;
     }
+    // After processing asteroid data and creating orbital paths, build the GUI list
+    try {
+      // Save original material properties for all orbital path objects so reset can restore them
+      this.orbitalPaths.forEach(obj => {
+        if (!obj || !obj.material) return
+        if (!obj.userData) obj.userData = {}
+        if (!obj.userData._originalMaterial) {
+          try {
+            obj.userData._originalMaterial = {
+              color: obj.material.color ? obj.material.color.clone() : new THREE.Color(0xffffff),
+              opacity: obj.material.opacity,
+              transparent: obj.material.transparent
+            }
+          } catch (e) {
+            obj.userData._originalMaterial = { color: new THREE.Color(0xffffff), opacity: obj.material.opacity, transparent: obj.material.transparent }
+          }
+        }
+      })
+      this.buildAsteroidGuiList()
+    } catch (e) {
+      console.warn('Failed to build asteroid GUI list after processing data', e)
+    }
     
   },
 
@@ -1750,6 +1923,16 @@ let app = {
     this.orbitalPaths.push(orbitingAsteroid);
     this.orbitalPaths.push(glowSphere);
     this.orbitalPaths.push(outerGlowSphere);
+
+    // Ensure glow spheres know which asteroid they belong to (so GUI highlighting can match them)
+    try {
+      glowSphere.userData = glowSphere.userData || {}
+      outerGlowSphere.userData = outerGlowSphere.userData || {}
+      glowSphere.userData.name = name
+      outerGlowSphere.userData.name = name
+    } catch (e) {
+      // ignore
+    }
   },
 
   updateOrbitalPaths() {
